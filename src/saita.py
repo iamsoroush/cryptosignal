@@ -1,7 +1,7 @@
 from src.candle import CandleProcessor
 from src.data_handling import DataLoader
 from src.utils import miliseconds_timestamp_to_str
-from src import TIME_DATA_MEMORY_IN_DAYS
+from src import TIME_DATA_MEMORY_IN_DAYS, N_DERIVATIVES
 
 
 class SAITA:
@@ -17,9 +17,6 @@ class SAITA:
             return None
 
         candle_name_patterns, pattern_site_inference, historical_inference = res
-
-        if candle_name_patterns is None:
-            return None
 
         if candle_name_patterns['Bull']:
             bulls = ' - '.join(['_{}_'.format(item) for item in candle_name_patterns['Bull']])
@@ -42,6 +39,7 @@ class SAITA:
                    last_candle['Volume'],
                    miliseconds_timestamp_to_str(last_candle['DateTime']).split('.')[0],
                    pattern_site_inference]
+
         if historical_inference is None:
             addon = 'No matched pattern group found in the last {} days!'.format(TIME_DATA_MEMORY_IN_DAYS)
         else:
@@ -49,22 +47,23 @@ class SAITA:
             addon = self._prepare_historical_report(high_max, low_min, time_frame)
         formats.append(addon)
 
-        report = """Report for *{}*@*{}*:
+        report = '''Report for *{}*@*{}*:
 
-🟢 *Bullish* patterns: {}
-🔴 *Bearish* patterns: {}
+🟩 *Bullish* patterns: {}
+🟥 *Bearish* patterns: {}
 
-    Open: *{}*
-    Close: *{}*
-    High: *{}*
-    Low: *{}*
-    Volume: *{}*
+    Open: *{:.2f}*
+    Close: *{:.2f}*
+    High: *{:.2f}*
+    Low: *{:.2f}*
+    Volume: *{:.2f}*
     DateTime: _{}_
 
 ▫️ Inference based on _Patternsite_: *{}*
 
-▫️ Based on historical data: {}""".format(*formats)
-        return report
+▫️ Based on historical data: {}'''.format(*formats)
+
+        return report, violin_plot_path
 
     @staticmethod
     def _prepare_historical_report(high_max, low_min, time_frame):
@@ -76,13 +75,13 @@ class SAITA:
             l_10q = low_min[col]['10%']
             l_min = low_min[col]['min']
 
-            h_10q = high_max[col]['10%']
+            h_10q = high_max[col]['90%']
             h_max = high_max[col]['max']
 
             formats.append("""
-for the next {} hours:
-    In 90% of cases the price dumps less than *{}%*, with a maximum dump of *{}*
-    In 90% of cases the price pumps less than *{}%*, with a maximum pump of *{}*""".
+for the next *{:.2f}* hours:
+    In 90% of cases the price dumps less than *{:.2f}%*, with a maximum dump of *{:.2f}%*
+    In 90% of cases the price pumps less than *{:.2f}%*, with a maximum pump of *{:.2f}%*""".
                            format(step_minutes / 60,
                                   l_10q,
                                   l_min,
@@ -114,7 +113,7 @@ for the next {} hours:
         historical_df = self.data_loader.load_historical_time_data(pair,
                                                                    time_frame)
         historical_inference = None
-        if historical_df is not None:
+        if historical_df is not None and len(candles_df) > N_DERIVATIVES:
             historical_inference = self.candle_processor.historical_inference(patterns,
                                                                               historical_df,
                                                                               candles_df,
