@@ -3,6 +3,8 @@ import datetime
 import threading
 from time import sleep
 from requests.exceptions import ConnectTimeout
+import signal
+import sys
 
 from binance.client import Client
 from binance.websockets import BinanceSocketManager
@@ -27,6 +29,15 @@ logger = get_logger(name=__name__, write_logs=True)
 # Connect to database
 db_handler = DBHandler()
 db_handler.start()
+
+
+def signal_handler(sig, frame):
+    manager.close()
+    print('closed binance websocket manager.')
+    sys.exit(0)
+
+
+signal.signal(signal.SIGINT, signal_handler)
 
 
 def get_saita():
@@ -62,7 +73,7 @@ def candle_callback(msg):
              'High': float(candle_data[mapper['High']]),
              'Low': float(candle_data[mapper['Low']]),
              'Volume': float(candle_data[mapper['Volume']]),
-             'DateTime': candle_data[mapper['kline_close_time']]}
+             'DateTime': int(candle_data[mapper['kline_close_time']])}
         base_candle_collectors[pair].send(c)
 
 
@@ -95,7 +106,7 @@ def start_binance_websocket_manager():
 
 def start_telegram_bot():
     saita_bot = _get_saita_bot()
-    bot = saita_bot.dispatcher.bot
+    bot = saita_bot.updater.bot
     while True:
         try:
             saita_bot.run()
@@ -119,7 +130,7 @@ def get_data_handler():
     return data_handler
 
 
-def collect_data(data_handler, time_data_dir):
+def collect_data(data_handler):
 
     """Download new time-data from ccxt each saturday at 23:59:59"""
 
@@ -131,8 +142,7 @@ def collect_data(data_handler, time_data_dir):
         for base_currency, target_currency in itertools.product(BASE_CURRENCY_LIST, TARGET_CURRENCY_LIST):
             data_handler.update_time_data(base_currency,
                                           target_currency,
-                                          TIME_DATA_MEMORY_IN_DAYS,
-                                          time_data_dir)
+                                          TIME_DATA_MEMORY_IN_DAYS)
 
 
 if __name__ == '__main__':
@@ -177,18 +187,14 @@ if __name__ == '__main__':
     manager = start_binance_websocket_manager()
 
     # Start a loop to collect
-    try:
-        while True:
-            now = datetime.datetime.now()
-            next_call_dt = now + datetime.timedelta(hours=23 - now.hour,
-                                                    minutes=59 - now.minute,
-                                                    seconds=59 - now.second)
-            seconds_to_next_midnight = float((next_call_dt - now).seconds)
-            timer = threading.Timer(seconds_to_next_midnight,
-                                    collect_data,
-                                    args=(data_handler, TIME_DATA_DIR))
-            timer.start()
-            timer.join()
-    except KeyboardInterrupt as e:
-        print(e.args[0])
-        manager.close()
+    while True:
+        now = datetime.datetime.now()
+        next_call_dt = now + datetime.timedelta(hours=23 - now.hour,
+                                                minutes=59 - now.minute,
+                                                seconds=59 - now.second)
+        seconds_to_next_midnight = float((next_call_dt - now).seconds)
+        timer = threading.Timer(seconds_to_next_midnight,
+                                collect_data,
+                                args=(data_handler,))
+        timer.start()
+        timer.join()
