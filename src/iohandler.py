@@ -2,6 +2,7 @@ import os
 import threading
 
 import pandas as pd
+from telegram import ParseMode
 
 from src import COLLECTOR_MEMORY
 
@@ -20,12 +21,33 @@ mapper = {'kline_start_time': 't',
           'is_closed': 'x'}
 
 
-def send_report(bot, users, report):
-    for user in users:
-        bot.send_message(chat_id=user.chat_id,
-                         text=report,
-                         pars_mode='Markdown')
-        # logger
+def send_report(bot, users, report, plot_path):
+    if plot_path:
+        user = users[0]
+        message = bot.send_message(chat_id=user.chat_id,
+                                   text=report,
+                                   parse_mode=ParseMode.MARKDOWN)
+        with open(plot_path, 'rb') as photo:
+            message = bot.send_photo(chat_id=user.chat_id,
+                                     photo=photo,
+                                     caption='Historical inference',
+                                     reply_to_message_id=message.message_id)
+        os.remove(plot_path)
+        photo = message.photo[-1]
+        for user in users[1:]:
+            message = bot.send_message(chat_id=user.chat_id,
+                                       text=report,
+                                       parse_mode=ParseMode.MARKDOWN)
+            bot.send_photo(chat_id=user.chat_id,
+                           photo=photo,
+                           caption='Historical inference',
+                           reply_to_message_id=message.message_id)
+    else:
+        for user in users:
+            bot.send_message(chat_id=user.chat_id,
+                             text=report,
+                             parse_mode=ParseMode.MARKDOWN)
+            # logger
 
 
 def create_candle(sub_candles):
@@ -58,16 +80,18 @@ def sub_candle_collector(time_frame,
         sub_candles.append(sub_candle)
         if len(sub_candles) == limit_length:
             candle = create_candle(sub_candles)
+            sub_candles = list()
             memory.append(candle)
 
             users = db_handler.get_matched_users(currency_pair, time_frame.string)
             if users:
-                report = saita.generate_reports_time_based(currency_pair, time_frame, pd.DataFrame(memory))
-                if report:
+                res = saita.generate_reports_time_based(currency_pair, time_frame, pd.DataFrame(memory))
+                if res:
+                    report, plot_path = res
                     print('sending report of {}/{} to {} users.'.format(currency_pair, time_frame.string, len(users)))
-                    sender = threading.Thread(target=send_report, args=(bot, users, report))
+                    sender = threading.Thread(target=send_report, args=(bot, users, report, plot_path))
                     sender.start()
-                # print(reports)
+                    # print(reports)
 
             if len(memory) == COLLECTOR_MEMORY:
                 memory.pop(0)
@@ -75,8 +99,6 @@ def sub_candle_collector(time_frame,
             if children:
                 for child in children:
                     child.send(candle)
-
-            sub_candles = list()
 
 
 def read_binance_api():
