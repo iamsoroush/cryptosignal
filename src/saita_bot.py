@@ -374,7 +374,7 @@ def get_start_markup(pair, time_frame):
     text = '''تنظیمات کنونی:
 
 *{}*@*{}*'''.format(pair,
-                        time_frame)
+                    time_frame)
     keyboard = [[InlineKeyboardButton("تغییر سهم مورد نظر", callback_data='change_pair')],
                 [InlineKeyboardButton("تغییر قالب زمانی", callback_data='change_tf')]]
 
