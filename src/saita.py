@@ -10,7 +10,7 @@ class SAITA:
         self.candle_processor = CandleProcessor()
         self.data_loader = DataLoader()
 
-    def generate_reports_time_based(self, pair, time_frame, candles_df, gen_violin_plot=False):
+    def generate_reports_time_based(self, pair, time_frame, candles_df, gen_violin_plot=True):
 
         res = self.get_reports_time_based(pair, time_frame.string, candles_df, gen_violin_plot)
         if res is None:
