@@ -40,6 +40,7 @@ class SAITA:
                    last_candle['DateTime'].split('.')[0],
                    pattern_site_inference]
 
+        violin_plot_path = None
         if historical_inference is None:
             addon = 'No matched pattern group found in the last {} days!'.format(TIME_DATA_MEMORY_IN_DAYS)
         else:
