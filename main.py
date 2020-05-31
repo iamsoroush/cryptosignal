@@ -195,6 +195,7 @@ if __name__ == '__main__':
         seconds_to_next_midnight = float((next_call_dt - now).seconds)
         timer = threading.Timer(seconds_to_next_midnight,
                                 collect_data,
-                                args=(data_handler,))
+                                args=(data_handler,),
+                                daemon=True)
         timer.start()
         timer.join()
