@@ -368,7 +368,6 @@ class CandleProcessor:
                     fig = self._plot_dist(matched_samples, time_frame_minutes)
                     fig.savefig(path_to_plot)
                 else:
-
                     violin_df = self.generate_voilin_df(matched_samples)
                     fig, ax = plt.subplots(figsize=(12, 12), dpi=80)
                     sns.violinplot(x='# Next steps',
