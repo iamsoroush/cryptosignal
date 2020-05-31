@@ -18,7 +18,7 @@ from src import TIME_FRAMES,\
 from src.iohandler import sub_candle_collector, read_binance_api, mapper
 from src.saita import SAITA
 from src.data_handling import TimeDataHandler
-from src.utils import get_logger
+from src.utils import get_logger, miliseconds_timestamp_to_str
 from src.saita_bot import SAITABot
 from src.database import DBHandler
 
@@ -67,13 +67,14 @@ def candle_callback(msg):
     candle_data = msg['data']['k']
     is_closed = candle_data[mapper['is_closed']]
     if is_closed:
+        str_dt = miliseconds_timestamp_to_str(int(candle_data[mapper['kline_close_time']]))
         logger.info('received a closed candle for {}/{}'.format(pair, time_frame))
         c = {'Open': float(candle_data[mapper['Open']]),
              'Close': float(candle_data[mapper['Close']]),
              'High': float(candle_data[mapper['High']]),
              'Low': float(candle_data[mapper['Low']]),
              'Volume': float(candle_data[mapper['Volume']]),
-             'DateTime': int(candle_data[mapper['kline_close_time']])}
+             'DateTime': str_dt}
         base_candle_collectors[pair].send(c)
 
 
@@ -152,8 +153,7 @@ if __name__ == '__main__':
     # Update time-data
     for base_currency, target_currency in itertools.product(BASE_CURRENCY_LIST, TARGET_CURRENCY_LIST):
         data_handler.update_time_data(base_currency,
-                                      target_currency,
-                                      TIME_DATA_MEMORY_IN_DAYS)
+                                      target_currency)
 
     # Create SAITA's processing unit, SAITA-core
     saita = get_saita()
