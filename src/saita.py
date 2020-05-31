@@ -10,9 +10,9 @@ class SAITA:
         self.candle_processor = CandleProcessor()
         self.data_loader = DataLoader()
 
-    def generate_reports_time_based(self, pair, time_frame, candles_df, gen_violin_plot=True):
+    def generate_reports_time_based(self, pair, time_frame, candles_df, gen_violin_plot='dist'):
 
-        res = self.get_reports_time_based(pair, time_frame.string, candles_df, gen_violin_plot)
+        res = self.get_reports_time_based(pair, time_frame, candles_df, gen_violin_plot)
         if res is None:
             return None
 
@@ -37,7 +37,7 @@ class SAITA:
                    last_candle['High'],
                    last_candle['Low'],
                    last_candle['Volume'],
-                   miliseconds_timestamp_to_str(last_candle['DateTime']).split('.')[0],
+                   last_candle['DateTime'].split('.')[0],
                    pattern_site_inference]
 
         if historical_inference is None:
@@ -111,12 +111,13 @@ for the next *{:.2f}* hours:
         pattern_site_inference = self.candle_processor.pattern_site_infernece(patterns)
 
         historical_df = self.data_loader.load_historical_time_data(pair,
-                                                                   time_frame)
+                                                                   time_frame.string)
         historical_inference = None
         if historical_df is not None and len(candles_df) > N_DERIVATIVES:
             historical_inference = self.candle_processor.historical_inference(patterns,
                                                                               historical_df,
                                                                               candles_df,
+                                                                              time_frame.minutes,
                                                                               gen_violin_plots)
 
         candle_name_patterns = dict(Bull=list(), Bear=list())
