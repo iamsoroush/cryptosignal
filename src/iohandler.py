@@ -108,7 +108,7 @@ def sub_candle_collector(time_frame,
                 if res:
                     report, plot_path = res
                     print('sending report of {}/{} to {} users.'.format(currency_pair, time_frame.string, len(users)))
-                    sender = threading.Thread(target=send_report, args=(bot, users, report, plot_path))
+                    sender = threading.Thread(target=send_report, args=(bot, users, report, plot_path), daemon=True)
                     sender.start()
                     # print(reports)
 
