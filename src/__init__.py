@@ -38,7 +38,7 @@ TICK_BARS = (100, 500, 1000, 2000, 5000, 10000)
 TIME_DATA_MEMORY_IN_DAYS = 30 * 9
 
 # Candle Processor
-PROFIT_INTERVALS = (10, 30, 90)
+PROFIT_INTERVALS = (4, 12)
 N_DERIVATIVES = 3
 N_NEAREST_NEIGHBORS = 100
-COLLECTOR_MEMORY = 20  # How many candle do collector save to send to the saita's inference machine
+COLLECTOR_MEMORY = 10  # How many candle do collector save to send to the saita's inference machine
