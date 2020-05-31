@@ -5,7 +5,7 @@ from datetime import timedelta as dt_timedelta
 from src.fetching import Binance, CryptoTickFetcher
 from src.utils import save_df, load_df, get_logger
 from src.candle import CandleProcessor
-from src import TIME_FRAMES, TICK_BARS, TIME_DATA_DIR, TICK_DATA_DIR
+from src import TIME_FRAMES, TICK_BARS, TIME_DATA_DIR, TICK_DATA_DIR, TIME_DATA_MEMORY_IN_DAYS
 
 
 logger = get_logger(name=__name__, write_logs=True)
@@ -81,7 +81,7 @@ class TimeDataHandler(BaseDataHandler):
         self.binance = Binance()
         self.candle_processor = CandleProcessor()
 
-    def update_time_data(self, base_currency, target_currency, last_n_days):
+    def update_time_data(self, base_currency, target_currency):
 
         """Downloads and saves the data from last_n_days ago until the last monday.
 
@@ -99,7 +99,7 @@ class TimeDataHandler(BaseDataHandler):
                                     hours=now.hour,
                                     minutes=now.minute,
                                     seconds=now.second)
-        start_dt = end_dt - dt_timedelta(days=last_n_days)
+        start_dt = end_dt - dt_timedelta(days=TIME_DATA_MEMORY_IN_DAYS)
 
         start_time = self._dt_to_str(start_dt)
         end_time = self._dt_to_str(end_dt)
