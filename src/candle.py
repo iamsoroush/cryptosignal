@@ -322,7 +322,7 @@ class CandleProcessor:
         else:
             return 'Numb'
 
-    def historical_inference(self, patterns, historical_df, target_candles, gen_violin_plots):
+    def historical_inference(self, patterns, historical_df, target_candles, time_frame_minutes, plot='dist'):
 
         """Returns inference about the given patterns, based on provided historical data.
 
@@ -361,23 +361,53 @@ class CandleProcessor:
             lowest_min_desc.columns = [' '.join(i.split('-')[1:]) for i in lowest_min_desc.columns]
 
             path_to_plot = None
-            if gen_violin_plots and len(matched_samples) > 15:
-                violin_df = self.generate_voilin_df(matched_samples)
-                fig, ax = plt.subplots(figsize=(12, 12), dpi=80)
-                sns.violinplot(x='# Next steps',
-                               y='%Change',
-                               hue='Label',
-                               data=violin_df,
-                               split=True,
-                               linewidth=1,
-                               inner="quartile",
-                               palette=['green', 'red'],
-                               saturation=0.8,
-                               ax=ax)
+            if plot and len(matched_samples) > 15:
                 now = datetime.datetime.now()
                 path_to_plot = '{}.png'.format(now.microsecond)
-                fig.savefig(path_to_plot)
+                if plot == 'dist':
+                    fig = self._plot_dist(matched_samples, time_frame_minutes)
+                    fig.savefig(path_to_plot)
+                else:
+
+                    violin_df = self.generate_voilin_df(matched_samples)
+                    fig, ax = plt.subplots(figsize=(12, 12), dpi=80)
+                    sns.violinplot(x='# Next steps',
+                                   y='%Change',
+                                   hue='Label',
+                                   data=violin_df,
+                                   split=True,
+                                   linewidth=1,
+                                   inner="quartile",
+                                   palette=['green', 'red'],
+                                   saturation=0.8,
+                                   ax=ax)
+                    fig.savefig(path_to_plot)
             return (highest_max_desc, lowest_min_desc), path_to_plot
+
+    @staticmethod
+    def _plot_dist(matched_samples, time_frame_minutes):
+        hcols = [i for i in matched_samples.columns if i.startswith('Highest')]
+        lcols = [i for i in matched_samples.columns if i.startswith('Lowest')]
+
+        highs = matched_samples[hcols]
+        lows = matched_samples[lcols]
+
+        fig, axes = plt.subplots(nrows=len(hcols), figsize=(16, 10), sharex=True, dpi=80)
+
+        sns.set_style("darkgrid")
+
+        for i in range(len(hcols)):
+            ax = axes[i]
+            ax.tick_params(axis='both', which='both', labelsize=12, labelbottom=True)
+            h = highs[hcols[i]]
+            l = lows[lcols[i]]
+            sns.distplot(h, ax=ax, color='green')
+            sns.distplot(l, ax=ax, color='red', axlabel='%Change')
+            next_in_hours = int(hcols[i].split('-')[1]) * time_frame_minutes / 60
+            ax.set_title('Next {:.2f} hours'.format(next_in_hours))
+            ax.legend(['Highest Maximum', 'Lowest Minimum'])
+        ax.set_xlabel('%Change')
+        return fig
 
     def _handle_small_historical_data(self,
                                       historical_df,
@@ -424,13 +454,11 @@ class CandleProcessor:
         high_cols = [item for item in cols if item.startswith('Highest')]
         low_cols = [item for item in cols if item.startswith('Lowest')]
 
-        profit_intervals = (10, 30, 90)
-
         data = list()
         labels = list()
         interval = list()
 
-        for p in profit_intervals:
+        for p in PROFIT_INTERVALS:
             hc = [item for item in high_cols if int(item.split('-')[1]) == p][0]
             lc = [item for item in low_cols if int(item.split('-')[1]) == p][0]
 
@@ -460,7 +488,7 @@ class CandleProcessor:
             return list()
         else:
             return data_df.index[np.logical_and(np.all(data_df[patterns['Bull']] > 0, axis=1),
-                                                np.all(data_df[patterns['Bear']] > 0, axis=1))]
+                                                np.all(data_df[patterns['Bear']] < 0, axis=1))]
 
     @staticmethod
     def _get_matched_samples(data_df, patterns):
