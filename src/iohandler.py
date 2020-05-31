@@ -67,6 +67,25 @@ def sub_candle_collector(time_frame,
                          bot,
                          db_handler,
                          children=None):
+
+    """Collects sub-candles and send messages if a candle has been created.
+
+    Note: each yield is a dictionary of:
+        {'Open': float,
+         'Close': float,
+         'High': float,
+         'Low': float,
+         'Volume': float,
+         'DateTime': str of datetime object.
+
+    :param time_frame: object of TimeFrame
+    :param base_time_frame: object of TimeFrame
+    :param currency_pair: 'ETHUSDT'
+    :param saita: an object of saita.SAITA for processing the candle and generating report
+    :param bot: Telegram.Bot object for sending messages
+    :param db_handler: object of DBHandler for fetching data from database.
+    :param children: a list of collectors to send the candles from this collector to them."""
+
     print('I am {} collector for {}.'.format(time_frame.string, currency_pair))
 
     assert time_frame.minutes % base_time_frame.minutes == 0
