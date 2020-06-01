@@ -295,20 +295,31 @@ class SAITABot:
 
         logger.info('restart state for {}'.format(user_id))
 
-        query.answer('lets do it!')
+        if db_handler.exists(user_id):
+            query.answer('lets do it!')
+            user_data = db_handler.get_user(user_id)
+            reply_text, reply_markup = get_start_markup(user_data.pair, user_data.time_frame)
 
-        user_data = db_handler.get_user(user_id)
-        reply_text, reply_markup = get_start_markup(user_data.pair, user_data.time_frame)
-
-        try:
-            query.edit_message_text(
-                text=reply_text,
-                reply_markup=reply_markup,
-                parse_mode='MarkdownV2'
-            )
-        except BadRequest:
-            pass  # Message has not modified
-        return CHOOSE_PAIR_TF
+            try:
+                query.edit_message_text(
+                    text=reply_text,
+                    reply_markup=reply_markup,
+                    parse_mode='MarkdownV2'
+                )
+            except BadRequest:
+                pass  # Message has not modified
+            return CHOOSE_PAIR_TF
+        else:
+            query.answer("I can't recognize you!")
+            try:
+                query.edit_message_text(
+                    text="با ارسال /start شروع کنید.",
+                    reply_markup=None,
+                    parse_mode='MarkdownV2'
+                )
+            except BadRequest:
+                pass  # Message has not modified
+            return -1
 
     @staticmethod
     def not_recognized(update, context):
