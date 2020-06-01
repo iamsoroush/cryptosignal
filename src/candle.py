@@ -381,6 +381,7 @@ class CandleProcessor:
                                    saturation=0.8,
                                    ax=ax)
                     fig.savefig(path_to_plot)
+                plt.close()
             return (highest_max_desc, lowest_min_desc), path_to_plot
 
     @staticmethod
