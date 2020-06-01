@@ -73,6 +73,12 @@ class DBHandler:
         else:
             return list()
 
+    def get_users(self):
+
+        """Returns all the existing users."""
+
+        return User.select()
+
     @staticmethod
     def exists(user_id):
         return User.select().where(User.user_id == user_id).exists()
