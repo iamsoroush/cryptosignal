@@ -1,4 +1,3 @@
-import os
 import datetime
 
 import numpy as np
@@ -12,7 +11,6 @@ from src import PROFIT_INTERVALS, N_DERIVATIVES, N_NEAREST_NEIGHBORS
 
 
 class CandleProcessor:
-
     """Candle Processing class.
 
     public methods:
@@ -210,6 +208,10 @@ class CandleProcessor:
                                           df['Close'].values)
             value = c[-1]
             name_to_append = func_name
+            if func_name == 'CDLHIKKAKE' and np.abs(value) < 200:
+                continue
+            if np.abs(value) > 100:
+                name_to_append += ' (Confirmed)'
             if value > 0:
                 patterns['Bull'].append(name_to_append)
             elif value < 0:
@@ -217,6 +219,36 @@ class CandleProcessor:
             else:
                 continue
         return patterns
+
+    def get_patterns_for_last_n_candles(self, df, n):
+
+        """Returns the candle-patterns found for the last n time-steps.
+
+        Note: returned patterns are in func_name format, i.e. CNDLDOJISTAR
+
+        :arg df: Pandas DataFrame composed of 'Open', 'High', 'Low', 'Close'
+        :returns patters: [{'Bull': [pattern1, pattern2, ...], 'Bear': [pattern1, pattern2]},
+                           {'Bull': : [pattern1, pattern2, ...], 'Bear': [pattern1, pattern2]}, ...]
+        """
+
+        df_copy = df.copy()
+        for candle_name, func_name in self.func_mapper.items():
+            c = getattr(talib, func_name)(df['Open'].values,
+                                          df['High'].values,
+                                          df['Low'].values,
+                                          df['Close'].values)
+            df_copy[func_name] = c
+
+        out = list()
+        func_names = list(self.name_mapper.keys())
+        for ind in range(-n, 0):
+            patterns = dict(Bear=list(), Bull=list())
+            series = df.iloc[ind][func_names]
+            patterns['Bull'].extend(series[series > 0].index.tolist())
+            patterns['Bear'].extend(series[series < 0].index.tolist())
+            out.append(patterns)
+
+        return out
 
     def update_candles_df(self, df):
 
@@ -238,7 +270,9 @@ class CandleProcessor:
                                                       df['High'].values,
                                                       df['Low'].values,
                                                       df['Close'].values)
-        self._add_min_max(df)
+            if func_name == 'CDLHIKKAKE':
+                df[np.abs(df[func_name]) < 200][func_name] = 0
+        self._add_min_max(df, self.profit_intervals)
         self._add_price_derivative(df, n_d=3)
         self._add_volume_derivative(df, n_d=3)
         df.dropna(inplace=True)
@@ -273,23 +307,6 @@ class CandleProcessor:
                     patterns[dt]['Bear'].append(candle_name)
         return patterns
 
-    def process_rank_last_candle(self, df, ranking):
-
-        """returns only one of 'Bearish', 'Bullish', 'Numb' for the last candle of the passed DataFrame.
-
-        :arg df: see process_last_candle
-        :arg ranking: type of ranking, if 'patternsite' uses rankings of http://thepatternsite.com, if 'majority' just
-            the majority class, i.e. if bullish patterns > bearish patterns ==> Bull elif bearish patterns > bullish
-            patterns == Bear else ==> NT"""
-
-        assert ranking in ('majority', 'patternsite'), 'ranking argument must be one of (majority, patternsite)'
-
-        mapper = {'patternsite': self.pattern_site_infernece,
-                  'majority': self.majority_inference}
-
-        patterns = self.get_patterns_for_last_candle(df)
-        return mapper[ranking](patterns)
-
     def pattern_site_infernece(self, patterns):
 
         """Returns the candle's type based on rankings provided at http://thepatternsite.com: Bullish, Bearish or Numb
@@ -304,13 +321,15 @@ class CandleProcessor:
         bull_score = 0
         bear_score = 0
         for name in patterns['Bull']:
-            f_name = self.name_mapper[name]
+            # f_name = self.name_mapper[name]
+            f_name = name + '_' + 'Bull'
             if f_name in available_ranks:
                 bull_score += 1 / CandleProcessor.CANDLE_RANKINGS[f_name]
             else:
                 bull_score += 1 / mean_rank
         for name in patterns['Bear']:
-            f_name = self.name_mapper[name]
+            # f_name = self.name_mapper[name]
+            f_name = name + '_' + 'Bear'
             if f_name in available_ranks:
                 bear_score += 1 / CandleProcessor.CANDLE_RANKINGS[f_name]
             else:
@@ -322,7 +341,7 @@ class CandleProcessor:
         else:
             return 'Numb'
 
-    def historical_inference(self, patterns, historical_df, target_candles, time_frame_minutes, plot='dist'):
+    def historical_inference(self, patterns, historical_df, target_candles, time_frame_minutes, plot=True):
 
         """Returns inference about the given patterns, based on provided historical data.
 
@@ -364,50 +383,10 @@ class CandleProcessor:
             if plot and len(matched_samples) > 15:
                 now = datetime.datetime.now()
                 path_to_plot = '{}.png'.format(now.microsecond)
-                if plot == 'dist':
-                    fig = self._plot_dist(matched_samples, time_frame_minutes)
-                    fig.savefig(path_to_plot)
-                else:
-                    violin_df = self.generate_voilin_df(matched_samples)
-                    fig, ax = plt.subplots(figsize=(12, 12), dpi=80)
-                    sns.violinplot(x='# Next steps',
-                                   y='%Change',
-                                   hue='Label',
-                                   data=violin_df,
-                                   split=True,
-                                   linewidth=1,
-                                   inner="quartile",
-                                   palette=['green', 'red'],
-                                   saturation=0.8,
-                                   ax=ax)
-                    fig.savefig(path_to_plot)
+                fig = self._plot_dist(matched_samples, time_frame_minutes)
+                fig.savefig(path_to_plot)
                 plt.close()
             return (highest_max_desc, lowest_min_desc), path_to_plot
-
-    @staticmethod
-    def _plot_dist(matched_samples, time_frame_minutes):
-        hcols = [i for i in matched_samples.columns if i.startswith('Highest')]
-        lcols = [i for i in matched_samples.columns if i.startswith('Lowest')]
-
-        highs = matched_samples[hcols]
-        lows = matched_samples[lcols]
-
-        fig, axes = plt.subplots(nrows=len(hcols), figsize=(16, 10), sharex=True, dpi=80)
-
-        sns.set_style("darkgrid")
-
-        for i in range(len(hcols)):
-            ax = axes[i]
-            ax.tick_params(axis='both', which='both', labelsize=12, labelbottom=True)
-            h = highs[hcols[i]]
-            l = lows[lcols[i]]
-            sns.distplot(h, ax=ax, color='green')
-            sns.distplot(l, ax=ax, color='red', axlabel='%Change')
-            next_in_hours = int(hcols[i].split('-')[1]) * time_frame_minutes / 60
-            ax.set_title('Next {:.2f} hours'.format(next_in_hours))
-            ax.legend(['Highest Maximum', 'Lowest Minimum'])
-        ax.set_xlabel('%Change')
-        return fig
 
     def _handle_small_historical_data(self,
                                       historical_df,
@@ -420,26 +399,25 @@ class CandleProcessor:
 
         n_matched_samples = len(matched_samples_indx)
 
-        if n_matched_samples < 2:
+        if n_matched_samples < 10:
             return None
         else:
             matched_samples = historical_df.loc[matched_samples_indx]
+            matched_samples.dropna(inplace=True)
             if n_matched_samples < limit:
                 return matched_samples
             else:
-                matched_samples.dropna(inplace=True)
-
                 cols = matched_samples.columns
                 d_cols = [i for i in cols if i.startswith('d(')]
-
-                means = matched_samples[d_cols].mean().values
-                stds = matched_samples[d_cols].std().values
 
                 self._add_price_derivative(target_candles, N_DERIVATIVES)
                 self._add_volume_derivative(target_candles, N_DERIVATIVES)
                 target_candles.dropna(inplace=True)
                 if not np.any(target_candles):
                     return None
+
+                means = matched_samples[d_cols].mean().values
+                stds = matched_samples[d_cols].std().values
 
                 x = (matched_samples[d_cols].values - means) / (stds + np.finfo(float).eps)
                 y = np.expand_dims((target_candles[d_cols].values[-1] - means) / (stds + np.finfo(float).eps), axis=0)
@@ -448,30 +426,58 @@ class CandleProcessor:
                 neighbors = matched_samples.iloc[neighbor_indx]
                 return neighbors
 
+    # @staticmethod
+    # def generate_voilin_df(matched_samples):
+    #     cols = matched_samples.columns
+    #     high_cols = [item for item in cols if item.startswith('Highest')]
+    #     low_cols = [item for item in cols if item.startswith('Lowest')]
+    #
+    #     data = list()
+    #     labels = list()
+    #     interval = list()
+    #
+    #     for p in PROFIT_INTERVALS:
+    #         hc = [item for item in high_cols if int(item.split('-')[1]) == p][0]
+    #         lc = [item for item in low_cols if int(item.split('-')[1]) == p][0]
+    #
+    #         h = matched_samples[hc].values
+    #         l = matched_samples[lc].values
+    #
+    #         data.extend(np.concatenate([h, l]).tolist())
+    #         labels.extend(['Highest maximum'] * len(h))
+    #         labels.extend(['Lowest minimum'] * len(l))
+    #         interval.extend(['{} next steps'.format(p)] * (len(h) + len(l)))
+    #     return pd.DataFrame({'%Change': data,
+    #                          'Label': labels,
+    #                          '# Next steps': interval})
+
     @staticmethod
-    def generate_voilin_df(matched_samples):
-        cols = matched_samples.columns
-        high_cols = [item for item in cols if item.startswith('Highest')]
-        low_cols = [item for item in cols if item.startswith('Lowest')]
+    def _plot_dist(matched_samples, time_frame_minutes):
+        hcols = [i for i in matched_samples.columns if i.startswith('Highest')]
+        lcols = [i for i in matched_samples.columns if i.startswith('Lowest')]
 
-        data = list()
-        labels = list()
-        interval = list()
+        highs = matched_samples[hcols]
+        lows = matched_samples[lcols]
 
-        for p in PROFIT_INTERVALS:
-            hc = [item for item in high_cols if int(item.split('-')[1]) == p][0]
-            lc = [item for item in low_cols if int(item.split('-')[1]) == p][0]
+        fig, axes = plt.subplots(nrows=len(hcols),
+                                 figsize=(16, 10),
+                                 sharex=True,
+                                 dpi=80)
 
-            h = matched_samples[hc].values
-            l = matched_samples[lc].values
+        sns.set_style("darkgrid")
 
-            data.extend(np.concatenate([h, l]).tolist())
-            labels.extend(['Highest maximum'] * len(h))
-            labels.extend(['Lowest minimum'] * len(l))
-            interval.extend(['{} next steps'.format(p)] * (len(h) + len(l)))
-        return pd.DataFrame({'%Change': data,
-                             'Label': labels,
-                             '# Next steps': interval})
+        for i in range(len(hcols)):
+            ax = axes[i]
+            ax.tick_params(axis='both', which='both', labelsize=12, labelbottom=True)
+            h = highs[hcols[i]]
+            l = lows[lcols[i]]
+            sns.distplot(h, ax=ax, color='green', kde_kws={'bw': 0.2})
+            sns.distplot(l, ax=ax, color='red', axlabel='%Change', kde_kws={'bw': 0.2})
+            next_in_hours = int(hcols[i].split('-')[1]) * time_frame_minutes / 60
+            ax.set_title('Next {:.2f} hours'.format(next_in_hours))
+            ax.legend(['Highest Maximum', 'Lowest Minimum'])
+        ax.set_xlabel('%Change')
+        return fig
 
     @staticmethod
     def _get_neighbor_indxs(x, y, limit):
@@ -483,12 +489,12 @@ class CandleProcessor:
         return neighbor_indx
 
     @staticmethod
-    def _get_matched_sample_index(data_df, patterns):
+    def _get_matched_sample_index(historical_df, patterns):
         if not patterns['Bull'] and not patterns['Bear']:
             return list()
         else:
-            return data_df.index[np.logical_and(np.all(data_df[patterns['Bull']] > 0, axis=1),
-                                                np.all(data_df[patterns['Bear']] < 0, axis=1))]
+            return historical_df.index[np.logical_and(np.all(historical_df[patterns['Bull']] > 0, axis=1),
+                                                      np.all(historical_df[patterns['Bear']] < 0, axis=1))]
 
     @staticmethod
     def _get_matched_samples(data_df, patterns):
@@ -496,13 +502,14 @@ class CandleProcessor:
         res = res[np.all(res[patterns['Bear']] < 0, axis=1)]
         return res
 
-    def _add_min_max(self, df):
+    @staticmethod
+    def _add_min_max(df, profit_intervals):
 
         """Note: drop nan values using df.dropna(inplace=True)"""
 
         new_df = df[['Close', 'High', 'Low']]
 
-        for i in range(1, max(self.profit_intervals) + 1):
+        for i in range(1, max(profit_intervals) + 1):
             new_df['h_shifted_{}'.format(i)] = new_df['High'].shift(-i)
             new_df['l_shifted_{}'.format(i)] = new_df['Low'].shift(-i)
 
@@ -512,29 +519,31 @@ class CandleProcessor:
         high_cols = [item for item in cols if item.startswith('h_shifted')]
         low_cols = [item for item in cols if item.startswith('l_shifted')]
 
-        for p in self.profit_intervals:
+        for p in profit_intervals:
             hc = [item for item in high_cols if int(item.split('_')[-1]) <= p]
             lc = [item for item in low_cols if int(item.split('_')[-1]) <= p]
 
-            df['Highest-{}-steps'.format(p)] = 100 * (new_df[hc].max(axis=1) - new_df['Close']) / (new_df['Close'] + np.finfo(float).eps)
-            df['Lowest-{}-steps'.format(p)] = 100 * (new_df[lc].min(axis=1) - new_df['Close']) / (new_df['Close'] + np.finfo(float).eps)
+            df['Highest-{}-steps'.format(p)] = 100 * (new_df[hc].max(axis=1) - new_df['Close']) / \
+                                               (new_df['Close'] + np.finfo(float).eps)
+            df['Lowest-{}-steps'.format(p)] = 100 * (new_df[lc].min(axis=1) - new_df['Close']) / \
+                                              (new_df['Close'] + np.finfo(float).eps)
 
     @staticmethod
     def _add_price_derivative(df, n_d=3):
-        p = df['Close'].values
+        p = df['Close'].values.astype(np.float)
         for d in range(n_d):
-            p_padded = np.pad(p, (d + 1, 0), 'constant', constant_values=(np.nan, 0))
-            df['d(c){}'.format(d)] = (p - p_padded[: - (d + 1)]) / (p + np.finfo(float).eps)
+            p_padded = np.pad(p, (d + 1, 0), 'constant', constant_values=(np.nan, 0))[:len(p)]
+            df['d(c){}'.format(d)] = (p - p_padded) / (p + np.finfo(float).eps)
 
     @staticmethod
     def _add_volume_derivative(df, n_d=3):
-        v = df['Volume'].values
+        v = df['Volume'].values.astype(np.float)
         for d in range(n_d):
-            v_padded = np.pad(v, (d + 1, 0), 'constant', constant_values=(np.nan, 0))
-            df['d(v){}'.format(d)] = (v - v_padded[: - (d + 1)]) / (v + np.finfo(float).eps)
+            v_padded = np.pad(v, (d + 1, 0), 'constant', constant_values=(np.nan, 0))[:len(v)]
+            df['d(v){}'.format(d)] = (v - v_padded) / (v + np.finfo(float).eps)
 
     @staticmethod
     def _add_close_based_profit(df, profit_interval):
-        close = df['Close'].values
-        c_padded = np.pad(close, (0, profit_interval), 'constant', constant_values=(0, np.nan))
+        close = df['Close'].values.astype(np.float)
+        c_padded = np.pad(close, (0, profit_interval), 'constant', constant_values=(0, np.nan))[:len(close)]
         df['Profit{}'.format(profit_interval)] = (c_padded[profit_interval:] - close) / close * 100
