@@ -173,11 +173,11 @@ class TickDataHandler(BaseDataHandler):
         self.tick_fetcher = CryptoTickFetcher()
         self.candle_processor = CandleProcessor()
 
-    def save_7day_historical_tick_data(self,
-                                       base_currency,
-                                       target_currency,
-                                       start_time,
-                                       end_time):
+    def save_historical_data(self,
+                             base_currency,
+                             target_currency,
+                             start_time,
+                             end_time):
 
         """Fetches historical aggregated trade data from binance, and saves them each 7 days.
 
@@ -199,8 +199,10 @@ class TickDataHandler(BaseDataHandler):
 
         self._check_datetime_inputs(first_start_dt, end_dt)
 
+        symbol = '{}{}'.format(base_currency.upper(), target_currency.upper())
+
         start_time_in_ms = self._dt_to_ms(first_start_dt)
-        first_trade_id = self.tick_fetcher.get_starting_id(base_currency, target_currency, start_time_in_ms)
+        first_trade_id = self.tick_fetcher.get_starting_id(symbol, start_time_in_ms)
         start_id = first_trade_id
 
         delta = end_dt - first_start_dt
@@ -225,10 +227,10 @@ class TickDataHandler(BaseDataHandler):
                                                                          new_end_str,
                                                                          self.tick_bars)
 
-            self._save_tick_data(base_currency, target_currency, new_start_str, new_end_str, tick_data)
+            self._write_data(base_currency, target_currency, new_start_str, new_end_str, tick_data)
             start_id = last_id + 1
 
-    def save_last_week_trade_data(self, base_currency, target_currency, end_time):
+    def save_last_week_data(self, base_currency, target_currency, end_time):
 
         """Saves the last week's data, from weekday0 to last weekday0"""
 
@@ -244,9 +246,10 @@ class TickDataHandler(BaseDataHandler):
         start_dt = end_dt - dt_timedelta(days=7)
         start_time = self._dt_to_str(start_dt)
 
-        start_time_in_ms = start_dt.timestamp() * 1000
+        start_time_in_ms = int(start_dt.timestamp() * 1000)
 
-        first_trade_id = self.tick_fetcher.get_starting_id(base_currency, target_currency, start_time_in_ms)
+        symbol = '{}{}'.format(base_currency.upper(), target_currency.upper())
+        first_trade_id = self.tick_fetcher.get_starting_id(symbol, start_time_in_ms)
 
         tick_data, last_id = self.tick_fetcher.fetch_from_id_to_time(base_currency,
                                                                      target_currency,
@@ -254,15 +257,29 @@ class TickDataHandler(BaseDataHandler):
                                                                      end_time,
                                                                      self.tick_bars)
 
-        self._save_tick_data(base_currency, target_currency, start_time, end_time, tick_data)
+        self._write_data(base_currency, target_currency, start_time, end_time, tick_data)
 
-    def save_historical_trade_data(self, base_currency, target_currency, from_time, to_time):
+    def _fetch_last_week_data(self, pair):
+        now = datetime.now() - dt_timedelta(hours=6)
+        start_dt = now - dt_timedelta(days=7)
 
-        """Fetches historical aggregated trade data from binance, makes candles out of them and saves candles plus
-            patterns generated for them."""
+        start_time_in_ms = int(start_dt.timestamp() * 1000)
 
-        tick_data, last_id = self.tick_fetcher.fetch(base_currency, target_currency, from_time, to_time, self.tick_bars)
-        self._save_tick_data(base_currency, target_currency, from_time, to_time, tick_data)
+        first_trade_id = self.tick_fetcher.get_starting_id(pair, start_time_in_ms)
+        if first_trade_id is None:
+            return list()
+        tick_data = self.tick_fetcher._fetch_trades(pair,
+                                                    first_trade_id,
+                                                    self._dt_to_ms(now))
+        return tick_data
+
+    # def save_historical_trade_data(self, base_currency, target_currency, from_time, to_time):
+    #
+    #     """Fetches historical aggregated trade data from binance, makes candles out of them and saves candles plus
+    #         patterns generated for them."""
+    #
+    #     tick_data, last_id = self.tick_fetcher.fetch(base_currency, target_currency, from_time, to_time, self.tick_bars)
+    #     self._save_tick_data(base_currency, target_currency, from_time, to_time, tick_data)
 
     @staticmethod
     def _check_datetime_inputs(start_dt,
@@ -294,7 +311,7 @@ class TickDataHandler(BaseDataHandler):
                 return True
         return False
 
-    def _save_tick_data(self, base_currency, target_currency, start_time, end_time, tick_data):
+    def _write_data(self, base_currency, target_currency, start_time, end_time, tick_data):
 
         """Saves list of dataframe data in subdirectories of self.tick_bars at data_dir."""
 
