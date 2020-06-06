@@ -1,56 +1,88 @@
 import os
 import threading
 
-import pandas as pd
+import numpy as np
 from telegram import ParseMode
 
-from src import COLLECTOR_MEMORY
+from src import COLLECTOR_MEMORY, AGG_TRADE_COLLECTOR_MEMORY, GROUP_CHAT_ID
 
 
-mapper = {'kline_start_time': 't',
-          'kline_close_time': 'T',
-          'time_frame': 'i',
-          'first_trade_id': 'f',
-          'last_trade_id': 'L',
-          'Open': 'o',
-          'Close': 'c',
-          'High': 'h',
-          'Low': 'l',
-          'Volume': 'v',  # base asset volume, use 'q' for target asset's volume
-          'number_of_trades': 'n',
-          'is_closed': 'x'}
-
-
-def send_report(bot, users, report, plot_path):
-    if plot_path:
-        user = users[0]
-        message = bot.send_message(chat_id=user.chat_id,
-                                   text=report,
-                                   parse_mode=ParseMode.MARKDOWN)
-        with open(plot_path, 'rb') as photo:
+def send_report(bot, users, report, plot_path, hist_inference_report, dist_plot_path):
+    user = users[0]
+    with open(plot_path, 'rb') as photo:
+        message = bot.send_photo(chat_id=user.chat_id,
+                                 photo=photo,
+                                 caption=report,
+                                 parse_mode=ParseMode.MARKDOWN)
+    os.remove(plot_path)
+    photo_candles = message.photo[-1]
+    if dist_plot_path:
+        with open(dist_plot_path, 'rb') as photo:
             message = bot.send_photo(chat_id=user.chat_id,
                                      photo=photo,
-                                     caption='Historical inference',
-                                     reply_to_message_id=message.message_id)
-        os.remove(plot_path)
-        photo = message.photo[-1]
-        for user in users[1:]:
-            message = bot.send_message(chat_id=user.chat_id,
-                                       text=report,
-                                       parse_mode=ParseMode.MARKDOWN)
+                                     caption=hist_inference_report,
+                                     reply_to_message_id=message.message_id,
+                                     parse_mode=ParseMode.MARKDOWN)
+        os.remove(dist_plot_path)
+        photo_dist = message.photo[-1]
+
+    for user in users[1:]:
+        message = bot.send_photo(chat_id=user.chat_id,
+                                 photo=photo_candles,
+                                 caption=report,
+                                 parse_mode=ParseMode.MARKDOWN)
+        if dist_plot_path:
             bot.send_photo(chat_id=user.chat_id,
-                           photo=photo,
-                           caption='Historical inference',
-                           reply_to_message_id=message.message_id)
-    else:
-        for user in users:
-            bot.send_message(chat_id=user.chat_id,
-                             text=report,
-                             parse_mode=ParseMode.MARKDOWN)
-            # logger
+                           photo=photo_dist,
+                           caption=hist_inference_report,
+                           reply_to_message_id=message.message_id,
+                           parse_mode=ParseMode.MARKDOWN)
 
 
-def create_candle(sub_candles):
+    # if plot_path:
+    #     user = users[0]
+    #     message = bot.send_message(chat_id=user.chat_id,
+    #                                text=report,
+    #                                parse_mode=ParseMode.MARKDOWN,
+    #                                disable_web_page_preview=True)
+    #     with open(plot_path, 'rb') as photo:
+    #         message = bot.send_photo(chat_id=user.chat_id,
+    #                                  photo=photo,
+    #                                  caption='Historical inference',
+    #                                  reply_to_message_id=message.message_id)
+    #     os.remove(plot_path)
+    #     photo = message.photo[-1]
+    #     for user in users[1:]:
+    #         message = bot.send_message(chat_id=user.chat_id,
+    #                                    text=report,
+    #                                    parse_mode=ParseMode.MARKDOWN)
+    #         bot.send_photo(chat_id=user.chat_id,
+    #                        photo=photo,
+    #                        caption='Historical inference',
+    #                        reply_to_message_id=message.message_id)
+    # else:
+    #     for user in users:
+    #         bot.send_message(chat_id=user.chat_id,
+    #                          text=report,
+    #                          parse_mode=ParseMode.MARKDOWN,
+    #                          disable_web_page_preview=True)
+
+
+def send_agg_trade_report(bot, caption, plot_path):
+    with open(plot_path, 'rb') as photo:
+        bot.send_photo(chat_id=GROUP_CHAT_ID,
+                       photo=photo,
+                       caption=caption,
+                       parse_mode=ParseMode.MARKDOWN)
+    os.remove(plot_path)
+
+    # bot.send_message(chat_id=GROUP_CHAT_ID,
+    #                  text=report,
+    #                  parse_mode=ParseMode.MARKDOWN)
+
+
+def _create_candle(sub_candles):
+    # dt = miliseconds_timestamp_to_str(sub_candles[-1]['DateTime'])
     candle = {'Open': sub_candles[0]['Open'],
               'Close': sub_candles[-1]['Close'],
               'High': max([i['High'] for i in sub_candles]),
@@ -76,7 +108,7 @@ def sub_candle_collector(time_frame,
          'High': float,
          'Low': float,
          'Volume': float,
-         'DateTime': str of datetime object.
+         'DateTime': float(ms).
 
     :param time_frame: object of TimeFrame
     :param base_time_frame: object of TimeFrame
@@ -98,17 +130,22 @@ def sub_candle_collector(time_frame,
         sub_candle = (yield)
         sub_candles.append(sub_candle)
         if len(sub_candles) == limit_length:
-            candle = create_candle(sub_candles)
+            candle = _create_candle(sub_candles)
             sub_candles = list()
             memory.append(candle)
 
             users = db_handler.get_matched_users(currency_pair, time_frame.string)
             if users:
-                res = saita.generate_reports_time_based(currency_pair, time_frame, pd.DataFrame(memory))
+                res = saita.generate_reports_time_based(currency_pair, time_frame, memory)
                 if res:
-                    report, plot_path = res
+                    report, plot_path, hist_inference_report, dist_plot_path = res
                     print('sending report of {}/{} to {} users.'.format(currency_pair, time_frame.string, len(users)))
-                    sender = threading.Thread(target=send_report, args=(bot, users, report, plot_path), daemon=True)
+                    sender = threading.Thread(target=send_report, args=(bot,
+                                                                        users,
+                                                                        report,
+                                                                        plot_path,
+                                                                        hist_inference_report,
+                                                                        dist_plot_path), daemon=True)
                     sender.start()
                     # print(reports)
 
@@ -120,14 +157,55 @@ def sub_candle_collector(time_frame,
                     child.send(candle)
 
 
-def read_binance_api():
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    api_key = None
-    api_secret = None
-    with open(os.path.join(dir_path, 'binance.txt'), 'r') as file:
-        for line in file.readlines():
-            if line.startswith('API key'):
-                api_key = line.split(' ')[-1]
-            elif line.startswith('secret key'):
-                api_secret = line.split(' ')[-1]
-    return api_key, api_secret
+def _create_agg_candle(trades):
+    candle = {'Open': trades[0][1],
+              'Close': trades[-1][1],
+              'High': trades[:, 1].max(),
+              'Low': trades[:, 1].min(),
+              'Volume': trades[:, 2].sum(),
+              'Open Time': int(trades[0][0]),
+              'Close Time': int(trades[-1][0]),
+              'DateTime': int(trades[-1][0])}
+    return candle
+
+
+def agg_trade_coroutine(currency_pair, base_n_trades, n_trades, saita, bot, db_handler, children=None):
+
+    """In each yield, gents a dictionary of {'trade_time': int(ms), 'price': float, 'volume': float}.
+
+    Note: for base coroutine, give base_n_trades=1
+    """
+
+    assert n_trades % base_n_trades == 0
+
+    memory = list()
+    trades = np.zeros((n_trades, 3))
+    pointer = 0
+    while True:
+        trade = (yield)
+        trades[pointer] = trade
+        pointer += 1
+        if pointer == n_trades // base_n_trades:
+
+            # Make candle
+            candle = _create_agg_candle(trades)
+
+            # Initialize
+            trades = np.zeros((n_trades, 3))
+            pointer = 0
+
+            # Process
+            memory.append(candle)
+            report = saita.generate_report_agg_trade(currency_pair, n_trades, memory)
+            if report:
+                caption, plot_path = report
+                print('sending agg_trade report of {}/{} to the group.'.format(currency_pair, n_trades))
+                sender = threading.Thread(target=send_agg_trade_report, args=(bot, caption, plot_path), daemon=True)
+                sender.start()
+            if len(memory) > AGG_TRADE_COLLECTOR_MEMORY:
+                memory.pop(0)
+
+            # Send to children
+            if children:
+                for child in children:
+                    child.send(candle)
