@@ -2,8 +2,67 @@ import os
 import sys
 import logging
 from datetime import datetime
+from time import sleep
+import pytz
 
 import pandas as pd
+
+
+kline_mapper = {'kline_start_time': 't',
+                'kline_close_time': 'T',
+                'time_frame': 'i',
+                'pair': 's',
+                'first_trade_id': 'f',
+                'last_trade_id': 'L',
+                'Open': 'o',
+                'Close': 'c',
+                'High': 'h',
+                'Low': 'l',
+                'Volume': 'v',  # base asset volume, use 'q' for target asset's volume
+                'number_of_trades': 'n',
+                'is_closed': 'x'}
+
+
+agg_trade_mapper = {'event_time': 'E',  # int
+                    'pair': 's',  # str
+                    'agg_trade_id': 'a',  # int
+                    'price': 'p',  # str
+                    'volume': 'q',  # str
+                    'trade_time': 'T',  # int
+                    }
+
+
+def try_decorator(func):
+
+    def wrapper(*args, **kwargs):
+        for i in range(max_retries + 1):
+            try:
+                ret = func(*args, **kwargs)
+            except Exception as e:
+                if i < max_retries:
+                    sleep(sleep_seconds)
+                else:
+                    raise e
+            else:
+                return ret
+
+    sleep_seconds = 2
+    max_retries = 5
+
+    return wrapper
+
+
+def read_binance_api():
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    api_key = None
+    api_secret = None
+    with open(os.path.join(dir_path, 'binance.txt'), 'r') as file:
+        for line in file.readlines():
+            if line.startswith('API key'):
+                api_key = line.split(' ')[-1]
+            elif line.startswith('secret key'):
+                api_secret = line.split(' ')[-1]
+    return api_key, api_secret
 
 
 def get_logger(name, write_logs=True):
@@ -48,4 +107,9 @@ def miliseconds_timestamp_to_str(ms_timestamp):
     """:returns str datetime in %Y-%m-%d %H:%M:%S.%f format."""
 
     return datetime.fromtimestamp(ms_timestamp / 1000).isoformat()
+
+
+def get_tehran_ts(ts):
+    dt = datetime.fromtimestamp(ts / 1000)
+    return dt.astimezone(pytz.timezone('Asia/Tehran')).timestamp() * 1000
 
