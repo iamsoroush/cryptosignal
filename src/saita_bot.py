@@ -1,12 +1,11 @@
 import os
-import datetime
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, PicklePersistence, CallbackQueryHandler,\
     ConversationHandler
 from telegram.error import BadRequest
 
-from src.utils import get_logger, miliseconds_timestamp_to_str
+from src.utils import get_logger
 from src import TIME_FRAMES, BASE_CURRENCY_LIST, TARGET_CURRENCY_LIST
 
 
@@ -279,7 +278,6 @@ class SAITABot:
         )
         return CHOOSE_PAIR_TF
 
-
     @staticmethod
     def restart_state(update, context):
 
@@ -329,7 +327,7 @@ class SAITABot:
         It won't return anything in order to leave the state unchanged.
         """
 
-        text = """متوجه نشدم!"""
+        text = """متوجه نشدم! با دستور /start شروع کن."""
         update.message.reply_text(text)
 
     @staticmethod
