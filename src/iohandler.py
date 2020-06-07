@@ -82,7 +82,6 @@ def send_agg_trade_report(bot, caption, plot_path):
 
 
 def _create_candle(sub_candles):
-    # dt = miliseconds_timestamp_to_str(sub_candles[-1]['DateTime'])
     candle = {'Open': sub_candles[0]['Open'],
               'Close': sub_candles[-1]['Close'],
               'High': max([i['High'] for i in sub_candles]),
@@ -140,12 +139,14 @@ def sub_candle_collector(time_frame,
                 if res:
                     report, plot_path, hist_inference_report, dist_plot_path = res
                     print('sending report of {}/{} to {} users.'.format(currency_pair, time_frame.string, len(users)))
-                    sender = threading.Thread(target=send_report, args=(bot,
-                                                                        users,
-                                                                        report,
-                                                                        plot_path,
-                                                                        hist_inference_report,
-                                                                        dist_plot_path), daemon=True)
+                    sender = threading.Thread(target=send_report,
+                                              args=(bot,
+                                                    users,
+                                                    report,
+                                                    plot_path,
+                                                    hist_inference_report,
+                                                    dist_plot_path),
+                                              daemon=True)
                     sender.start()
                     # print(reports)
 
