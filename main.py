@@ -73,18 +73,14 @@ def _get_usdt_pairs(client):
             and not any(elem in s['symbol'].split('USDT')[0] for elem in ['USD', 'BTC', 'ETH', 'BNB', 'XRP'])]
 
 
-def _add_sockets(manager, pairs, base_time_frame, all_usdt_pairs, agg_trade_streams):
+def _get_streams(manager, pairs, base_time_frame, all_usdt_pairs, agg_trade_streams):
     streams = list()
     if agg_trade_streams:
         agg_trade_streams = [pair.lower() + '@aggTrade' for pair in all_usdt_pairs]
         streams.extend(agg_trade_streams)
     kline_streams = [pair.lower() + '@kline_' + base_time_frame for pair in pairs]
     streams.extend(kline_streams)
-
-    conn_key = manager.start_multiplex_socket(streams,
-                                              candle_callback)
-    logger.info('Connection keys: {}'.format(conn_key))
-
+    return streams
 
 @try_decorator
 def start_binance_websocket_manager(agg_trade_streams=False):
@@ -94,14 +90,14 @@ def start_binance_websocket_manager(agg_trade_streams=False):
 
     # For time-based candles
     base_time_frame = TIME_FRAMES[0]
-    valid_pairs = [i[0] + i[1] for i in list(itertools.product(BASE_CURRENCY_LIST, TARGET_CURRENCY_LIST))]
+    valid_pairs = [i[0] + i[1] for i in list(itertools.product(BASE_CURRENCY_LIST, TARGET_CURRENCY_LIST)) if i[0] != i[1]]
 
     # # For aggregated-trade candles, except BTC, ETH, BNB, XRP
     # all_usdt_pairs = _get_usdt_pairs(client)
     # n_trades = _get_n_trades_for_alts(all_usdt_pairs)
 
     # Add sockets to manager
-    _add_sockets(manager, valid_pairs, base_time_frame.string, list(N_TRADES.keys()), agg_trade_streams)
+    streams = _get_streams(manager, valid_pairs, base_time_frame.string, list(N_TRADES.keys()), agg_trade_streams)
 
     # Generate time-based collectors for base time-frame
     global kline_base_candle_collectors
@@ -111,6 +107,10 @@ def start_binance_websocket_manager(agg_trade_streams=False):
     if agg_trade_streams:
         global agg_trade_candle_collectors
         agg_trade_candle_collectors = generate_agg_trade_base_candle_collectors(list(N_TRADES.keys()))
+
+    conn_key = manager.start_multiplex_socket(streams,
+                                              candle_callback)
+    logger.info('Connection keys: {}'.format(conn_key))
 
     manager.start()
     logger.info('binance websocket started listening ...')
@@ -240,8 +240,9 @@ if __name__ == '__main__':
     # Update time-data
     if args.update_time_data:
         for base_currency, target_currency in itertools.product(BASE_CURRENCY_LIST, TARGET_CURRENCY_LIST):
-            data_handler.update_time_data(base_currency,
-                                          target_currency)
+            if not base_currency == target_currency:
+                data_handler.update_time_data(base_currency,
+                                              target_currency)
 
     if args.update_n_trades:
         N_TRADES = save_agg_trade_n_trades()
