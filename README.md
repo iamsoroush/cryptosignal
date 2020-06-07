@@ -15,5 +15,6 @@ SorMeh's AI-based Trading Assistant.
 - `pip install python-telegram-bot --upgrade`
 - `conda install -c quantopian ta-lib`
 - `conda install requests`
-- `conds install psutil`
+- `conda install psutil`
+- `conda install plotly`
 - `conda install -c plotly plotly-orca`
