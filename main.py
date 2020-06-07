@@ -190,7 +190,7 @@ def generate_agg_trade_base_candle_collectors(pairs):
     return candle_collectors
 
 
-def _get_n_trades_for_alts(pairs, quantile=0.15):
+def _get_n_trades_for_alts(pairs, quantile=15):
     n_trades = dict()
     handler = TickDataHandler()
     for pair in pairs:
@@ -203,7 +203,7 @@ def _get_n_trades_for_alts(pairs, quantile=0.15):
 
         # in 90% of the cases, n trades has been made in higher than 60 seconds. if this amount of trades has received
         # in less than 60 seconds, the asset is going to that 0.1 state.
-        n = int(60 / np.quantile(diffs, quantile) * 10)
+        n = int(60 / np.percentile(diffs, quantile) * 10)
         n_trades[pair] = n
     return n_trades
 
