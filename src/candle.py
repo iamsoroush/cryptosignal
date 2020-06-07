@@ -54,7 +54,7 @@ class CandleProcessor:
                     'Harami Pattern',
                     'Harami Cross Pattern',
                     'High-Wave Candle',
-                    'Hikkake Pattern',
+                    'Hikkake Pattern (Confirmed)',
                     'Modified Hikkake Pattern',
                     'Homing Pigeon',
                     'Identical Three Crows',
@@ -210,8 +210,8 @@ class CandleProcessor:
             name_to_append = func_name
             if func_name == 'CDLHIKKAKE' and np.abs(value) < 200:
                 continue
-            if np.abs(value) > 100:
-                name_to_append += ' (Confirmed)'
+            # if np.abs(value) > 100:
+            #     name_to_append += ' (Confirmed)'
             if value > 0:
                 patterns['Bull'].append(name_to_append)
             elif value < 0:
@@ -273,8 +273,8 @@ class CandleProcessor:
             if func_name == 'CDLHIKKAKE':
                 df[np.abs(df[func_name]) < 200][func_name] = 0
         self._add_min_max(df, self.profit_intervals)
-        self._add_price_derivative(df, n_d=3)
-        self._add_volume_derivative(df, n_d=3)
+        self._add_price_derivative(df, n_d=N_DERIVATIVES)
+        self._add_volume_derivative(df, n_d=N_DERIVATIVES)
         df.dropna(inplace=True)
 
     def get_patterns_for_all_candles(self, df):
@@ -345,7 +345,8 @@ class CandleProcessor:
 
         """Returns inference about the given patterns, based on provided historical data.
 
-        :param target_candles: list of candles which the last one is the target candle.
+        :param target_candles: DataFrame of candles which the last row is the target candle. the columns:
+            ['Open', 'High', 'Low', 'Close', 'Volume']
         :arg patterns: output of self.get_patterns_for_last_candle()
         :arg historical_df: same as sample, historical candles.
 
@@ -410,10 +411,11 @@ class CandleProcessor:
                 cols = matched_samples.columns
                 d_cols = [i for i in cols if i.startswith('d(')]
 
-                self._add_price_derivative(target_candles, N_DERIVATIVES)
-                self._add_volume_derivative(target_candles, N_DERIVATIVES)
-                target_candles.dropna(inplace=True)
-                if not np.any(target_candles):
+                n_derivatives = int(len(d_cols) // 2)
+                self._add_price_derivative(target_candles, n_derivatives)
+                self._add_volume_derivative(target_candles, n_derivatives)
+                # target_candles.dropna(inplace=True)
+                if not np.any(target_candles.dropna()):
                     return None
 
                 means = matched_samples[d_cols].mean().values
@@ -471,8 +473,8 @@ class CandleProcessor:
             ax.tick_params(axis='both', which='both', labelsize=12, labelbottom=True)
             h = highs[hcols[i]]
             l = lows[lcols[i]]
-            sns.distplot(h, ax=ax, color='green', kde_kws={'bw': 0.2})
-            sns.distplot(l, ax=ax, color='red', axlabel='%Change', kde_kws={'bw': 0.2})
+            sns.distplot(h, ax=ax, color='green', kde_kws={'bw': 0.15})
+            sns.distplot(l, ax=ax, color='red', axlabel='%Change', kde_kws={'bw': 0.15})
             next_in_hours = int(hcols[i].split('-')[1]) * time_frame_minutes / 60
             ax.set_title('Next {:.2f} hours'.format(next_in_hours))
             ax.legend(['Highest Maximum', 'Lowest Minimum'])
@@ -529,14 +531,14 @@ class CandleProcessor:
                                               (new_df['Close'] + np.finfo(float).eps)
 
     @staticmethod
-    def _add_price_derivative(df, n_d=3):
+    def _add_price_derivative(df, n_d):
         p = df['Close'].values.astype(np.float)
         for d in range(n_d):
             p_padded = np.pad(p, (d + 1, 0), 'constant', constant_values=(np.nan, 0))[:len(p)]
             df['d(c){}'.format(d)] = (p - p_padded) / (p + np.finfo(float).eps)
 
     @staticmethod
-    def _add_volume_derivative(df, n_d=3):
+    def _add_volume_derivative(df, n_d):
         v = df['Volume'].values.astype(np.float)
         for d in range(n_d):
             v_padded = np.pad(v, (d + 1, 0), 'constant', constant_values=(np.nan, 0))[:len(v)]
