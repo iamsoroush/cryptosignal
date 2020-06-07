@@ -259,9 +259,9 @@ class TickDataHandler(BaseDataHandler):
 
         self._write_data(base_currency, target_currency, start_time, end_time, tick_data)
 
-    def _fetch_last_week_data(self, pair):
+    def _fetch_last_2weeks_data(self, pair):
         now = datetime.now() - dt_timedelta(hours=6)
-        start_dt = now - dt_timedelta(days=7)
+        start_dt = now - dt_timedelta(days=14)
 
         start_time_in_ms = int(start_dt.timestamp() * 1000)
 
