@@ -90,6 +90,10 @@ class TimeDataHandler(BaseDataHandler):
         :param last_n_days: for last 6 months, pass 180
         """
 
+        if base_currency == target_currency:
+            logger.warning('skipping {}{}'.format(base_currency, target_currency))
+            return
+
         base_currency = base_currency.upper()
         target_currency = target_currency.upper()
         pair = '{}{}'.format(base_currency, target_currency)
