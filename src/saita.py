@@ -12,7 +12,6 @@ from src.data_handling import DataLoader
 from src import N_DERIVATIVE_AGG_TRADE, N_DERIVATIVES, TIME_DATA_MEMORY_IN_DAYS
 from src.utils import miliseconds_timestamp_to_str
 
-
 report_time_based_consecutive = '''Report for *{}*@*{}*:
 
 🟩 *Bullish* patterns: {}
@@ -28,7 +27,6 @@ DateTime: _{}_
 ▫️ Inference based on [Patternsite](http://thepatternsite.com): *{}*
 
 *Three consecutive {} patterns have been occured!*'''
-
 
 report_time_based = '''Report for *{}*@*{}*:
 
@@ -57,8 +55,8 @@ class SAITA:
 
         :param pair: ETHUSDT
         :param n_trades: number of trades each candle contains
-        :param candles: list of candles, each one is a dictionary candle of ('Open': float, 'Close': float, 'High': float,
-            'Low': float, 'Volume': float, 'Open Time': int(ms), 'Close Time': int(ms)]
+        :param candles: list of candles, each one is a dictionary candle of ('Open': float, 'Close': float,
+         'High': float, 'Low': float, 'Volume': float, 'Open Time': int(ms), 'Close Time': int(ms)]
 
         :returns report: it will be None if could'nt find any momentum3 change on price and volume, else a report to
             send to users.
@@ -76,8 +74,10 @@ class SAITA:
                 second_last_candle = candles[-2]
                 second_last_candle_interval = second_last_candle['Interval(s)']
                 if interval_sec <= second_last_candle_interval:
-                    p_change = (last_candle['Close'] - last_candle['Open']) / (last_candle['Open'] + np.finfo(float).eps)
-                    v_change = (last_candle['Volume'] - second_last_candle['Volume']) / (second_last_candle['Volume'] + np.finfo(float).eps)
+                    p_change = (last_candle['Close'] - last_candle['Open']) / (
+                            last_candle['Open'] + np.finfo(float).eps)
+                    v_change = (last_candle['Volume'] - second_last_candle['Volume']) / (
+                            second_last_candle['Volume'] + np.finfo(float).eps)
                     # inference = 'Bullish'
                     # if p_change < 0:
                     #     inference = 'Bearish'
@@ -104,7 +104,8 @@ Volume change: {:.2f}%'''.format(n_trades,
         :param time_frame: obj of type src.TimeFrame
         :param candles: list of dictionaries with these keys (Open, Close, High, Low, Volume, DateTime(float))"""
 
-        res = self.get_reports_time_based(pd.DataFrame(candles))
+        candles_df = pd.DataFrame(candles)
+        res = self.get_reports_time_based(candles_df[['Open', 'High', 'Low', 'Close']])
         last_candle = candles[-1]
         last_candle['Inference'] = 'Numb'
         last_candle['Bullish Patterns'] = None
@@ -138,7 +139,8 @@ Volume change: {:.2f}%'''.format(n_trades,
                    miliseconds_timestamp_to_str(last_candle['DateTime']).split('.')[0],
                    pattern_site_inference]
 
-        historical_inference = self._get_historical_inference(pd.DataFrame(candles))
+        historical_inference = self._get_historical_inference(candles_df[['Open', 'High', 'Low', 'Close', 'Volume']],
+                                                              pair, time_frame, patterns)
         if historical_inference:
             (high_max_desc, low_min_desc), dist_plot_path = historical_inference
             col = high_max_desc.columns[0]
@@ -165,11 +167,11 @@ Volume change: {:.2f}%'''.format(n_trades,
 
         if len(candles) > 2:
             if 'Inference' in candles[-2].keys() and 'Inference' in candles[-3].keys():
-                if candles[-2]['Inference'] == pattern_site_inference and candles[-3]['Inference'] == pattern_site_inference:
+                if candles[-2]['Inference'] == pattern_site_inference and\
+                        candles[-3]['Inference'] == pattern_site_inference:
                     path_to_plot = self._plot_candles(candles, pattern_site_inference, True)
                     formats.append(pattern_site_inference)
                     report = report_time_based_consecutive.format(*formats)
-                    # report += addon_report
                     return report, path_to_plot, addon_report, dist_plot_path
 
         path_to_plot = self._plot_candles(candles, pattern_site_inference, False)
@@ -268,12 +270,13 @@ for the next *{:.2f}* hours:
 
         historical_df = self.data_loader.load_historical_time_data(pair,
                                                                    time_frame.string)
-        historical_inference = None
         if historical_df is not None and len(candles_df) > N_DERIVATIVES:
             historical_inference = self.candle_processor.historical_inference(patterns,
                                                                               historical_df,
                                                                               candles_df,
                                                                               time_frame.minutes)
+        else:
+            historical_inference = None
         return historical_inference
 
     def get_reports_time_based(self, candles_df):
