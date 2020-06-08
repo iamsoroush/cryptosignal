@@ -164,9 +164,9 @@ def _create_agg_candle(trades):
               'High': trades[:, 1].max(),
               'Low': trades[:, 1].min(),
               'Volume': trades[:, 2].sum(),
-              'Open Time': int(trades[0][0]),
-              'Close Time': int(trades[-1][0]),
-              'DateTime': int(trades[-1][0])}
+              'Open Time': float(trades[0][0]),
+              'Close Time': float(trades[-1][0]),
+              'DateTime': float(trades[-1][0])}
     return candle
 
 
