@@ -14,8 +14,8 @@ from src.utils import miliseconds_timestamp_to_str
 
 report_time_based_consecutive = '''Report for *{}*@*{}*:
 
-🟩 *Bullish* patterns: {}
-🟥 *Bearish* patterns: {}
+⬆️ *Bullish* patterns: {}
+⬇️ *Bearish* patterns: {}
 
 Open: *{:.2f}*
 Close: *{:.2f}*
@@ -30,8 +30,8 @@ DateTime: _{}_
 
 report_time_based = '''Report for *{}*@*{}*:
 
-🟩 *Bullish* patterns: {}
-🟥 *Bearish* patterns: {}
+⬆️ *Bullish* patterns: {}
+⬇️ *Bearish* patterns: {}
 
     Open: *{:.2f}*
     Close: *{:.2f}*
@@ -48,6 +48,7 @@ class SAITA:
     def __init__(self):
         self.candle_processor = CandleProcessor()
         self.data_loader = DataLoader()
+        self.plotter = Plotter()
 
     def generate_report_agg_trade(self, pair, n_trades, candles):
 
@@ -78,11 +79,11 @@ class SAITA:
                             last_candle['Open'] + np.finfo(float).eps)
                     v_change = (last_candle['Volume'] - second_last_candle['Volume']) / (
                             second_last_candle['Volume'] + np.finfo(float).eps)
-                    # inference = 'Bullish'
-                    # if p_change < 0:
-                    #     inference = 'Bearish'
-                    # elif p_change == 0:
-                    #     inference = None
+                    inference = 'Bullish'
+                    if p_change < 0:
+                        inference = 'Bearish'
+                    elif p_change == 0:
+                        inference = None
 
                     caption = '''*Instant signal*: *{}* trades just have been made for *{}* in {} seconds.
 
@@ -92,8 +93,7 @@ Volume change: {:.2f}%'''.format(n_trades,
                                  interval_sec,
                                  p_change * 100,
                                  v_change * 100)
-                    # path_to_plot = self._plot_candles(candles, inference, False)
-                    path_to_plot = self._plot_candles_plotly(pd.DataFrame(candles))
+                    path_to_plot = self.plotter.plot_candles_mplfinance(candles, inference, False)
                     return caption, path_to_plot
 
     def generate_reports_time_based(self, pair, time_frame, candles):
@@ -169,77 +169,14 @@ Volume change: {:.2f}%'''.format(n_trades,
             if 'Inference' in candles[-2].keys() and 'Inference' in candles[-3].keys():
                 if candles[-2]['Inference'] == pattern_site_inference and\
                         candles[-3]['Inference'] == pattern_site_inference:
-                    path_to_plot = self._plot_candles(candles, pattern_site_inference, True)
+                    path_to_plot = self.plotter.plot_candles_mplfinance(candles, pattern_site_inference, True)
                     formats.append(pattern_site_inference)
                     report = report_time_based_consecutive.format(*formats)
                     return report, path_to_plot, addon_report, dist_plot_path
 
-        path_to_plot = self._plot_candles(candles, pattern_site_inference, False)
+        path_to_plot = self.plotter.plot_candles_mplfinance(candles, pattern_site_inference, False)
         report = report_time_based.format(*formats)
-        # report += addon_report
         return report, path_to_plot, addon_report, dist_plot_path
-
-    @staticmethod
-    def _plot_candles(candles, inference, three_same_patterns):
-        sample_to_plot = pd.DataFrame(candles)
-        sample_to_plot.index = pd.DatetimeIndex(sample_to_plot['DateTime'])
-        now = datetime.datetime.now()
-        path_to_plot = '{}.png'.format(now.microsecond)
-        if inference == 'Bullish':
-            color = 'g'
-        elif inference == 'Bearish':
-            color = 'r'
-        else:
-            color = None
-
-        if three_same_patterns:
-            mpf.plot(sample_to_plot, type='candle', style='charles',
-                     volume=True, returnfig=True, figscale=1.5, savefig=path_to_plot,
-                     vlines=dict(vlines=sample_to_plot.index[-2], linewidths=160, alpha=0.3, colors=color))
-        else:
-            mpf.plot(sample_to_plot, type='candle', style='charles',
-                     volume=True, returnfig=True, figscale=1.5, savefig=path_to_plot,
-                     vlines=dict(vlines=sample_to_plot.index[-1], linewidths=40, alpha=0.3, colors=color))
-        plt.close()
-        return path_to_plot
-
-    @staticmethod
-    def _plot_candles_plotly(df):
-        fig = make_subplots(rows=2, cols=1,
-                            shared_xaxes=True,
-                            row_heights=(0.8, 0.2),
-                            vertical_spacing=0.02)
-
-        fig.add_trace(go.Candlestick(x=df['DateTime'],
-                                     open=df['Open'],
-                                     high=df['High'],
-                                     low=df['Low'],
-                                     close=df['Close'],
-                                     xaxis="x",
-                                     yaxis="y",
-                                     visible=True,
-                                     showlegend=False),
-                      row=1, col=1)
-        colors = list()
-        for row in df.iterrows():
-            if row[1]['Close'] > row[1].Open:
-                colors.append('green')
-            else:
-                colors.append('red')
-        fig.add_trace(go.Bar(x=df['DateTime'],
-                             y=df['Volume'],
-                             showlegend=False,
-                             marker_color=colors,
-                             opacity=0.6),
-                      row=2, col=1)
-
-        fig.update_yaxes(title_text="Price", row=1, col=1)
-        fig.update_yaxes(title_text="Volume", row=2, col=1)
-        fig.update_layout(xaxis_rangeslider_visible=False)
-        now = datetime.datetime.now()
-        path_to_plot = '{}.png'.format(now.microsecond)
-        fig.write_image(path_to_plot)
-        return path_to_plot
 
     @staticmethod
     def _prepare_historical_report(high_max, low_min, time_frame):
@@ -315,3 +252,86 @@ for the next *{:.2f}* hours:
             candle_name_patterns['Bear'].append(self.candle_processor.name_mapper[fn])
 
         return patterns, candle_name_patterns, pattern_site_inference
+
+
+class Plotter:
+
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def plot_candles_mplfinance(candles, inference, three_same_patterns):
+
+        """Plots candles using mplfinance, saves the plot and returns the path to the .png file.
+
+        :param candles: list of dictionaries with these keys: ['Open', 'High', 'Low', 'Close', 'Volume', 'DateTime'] and
+         the 'DateTime' field must be a miliseconds timestamp.
+        :param inference: the color of the last candle area will be determined based on this argument.
+        :param three_same_patterns: whether to consider the three last candles for highlighting.
+
+        :returns path_to_plot
+        """
+
+        sample_to_plot = pd.DataFrame(candles)
+        sample_to_plot.index = pd.DatetimeIndex(sample_to_plot['DateTime'])
+        now = datetime.datetime.now()
+        path_to_plot = '{}.png'.format(now.microsecond)
+        if inference == 'Bullish':
+            color = 'g'
+        elif inference == 'Bearish':
+            color = 'r'
+        else:
+            color = None
+
+        if three_same_patterns:
+            vlines_args = dict(vlines=sample_to_plot.index[-2], linewidths=160, alpha=0.3, colors=color)
+        else:
+            vlines_args = dict(vlines=sample_to_plot.index[-1], linewidths=40, alpha=0.3, colors=color)
+        mpf.plot(sample_to_plot,
+                 type='candle',
+                 style='charles',
+                 volume=True,
+                 figscale=1.5,
+                 savefig=path_to_plot,
+                 show_nontrading=True,
+                 vlines=vlines_args)
+        plt.close()
+        return path_to_plot
+
+    @staticmethod
+    def plot_candles_plotly(df):
+        fig = make_subplots(rows=2, cols=1,
+                            shared_xaxes=True,
+                            row_heights=(0.8, 0.2),
+                            vertical_spacing=0.02)
+
+        fig.add_trace(go.Candlestick(x=df['DateTime'],
+                                     open=df['Open'],
+                                     high=df['High'],
+                                     low=df['Low'],
+                                     close=df['Close'],
+                                     xaxis="x",
+                                     yaxis="y",
+                                     visible=True,
+                                     showlegend=False),
+                      row=1, col=1)
+        colors = list()
+        for row in df.iterrows():
+            if row[1]['Close'] > row[1].Open:
+                colors.append('green')
+            else:
+                colors.append('red')
+        fig.add_trace(go.Bar(x=df['DateTime'],
+                             y=df['Volume'],
+                             showlegend=False,
+                             marker_color=colors,
+                             opacity=0.6),
+                      row=2, col=1)
+
+        fig.update_yaxes(title_text="Price", row=1, col=1)
+        fig.update_yaxes(title_text="Volume", row=2, col=1)
+        fig.update_layout(xaxis_rangeslider_visible=False)
+        now = datetime.datetime.now()
+        path_to_plot = '{}.png'.format(now.microsecond)
+        fig.write_image(path_to_plot)
+        return path_to_plot
