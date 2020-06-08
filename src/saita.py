@@ -80,11 +80,11 @@ class SAITA:
                             last_candle['Open'] + np.finfo(float).eps)
                     v_change = (last_candle['Volume'] - second_last_candle['Volume']) / (
                             second_last_candle['Volume'] + np.finfo(float).eps)
-                    inference = 'Bullish'
-                    if p_change < 0:
-                        inference = 'Bearish'
-                    elif p_change == 0:
-                        inference = None
+                    # inference = 'Bullish'
+                    # if p_change < 0:
+                    #     inference = 'Bearish'
+                    # elif p_change == 0:
+                    #     inference = None
 
                     caption = '''*Instant signal*: *{}* trades just have been made for *{}* in {} seconds.
 
@@ -94,7 +94,7 @@ Volume change: {:.2f}%'''.format(n_trades,
                                  interval_sec,
                                  p_change * 100,
                                  v_change * 100)
-                    path_to_plot = self.plotter.plot_candles_mplfinance(candles, inference, False)
+                    path_to_plot = self.plotter.plot_candles_mplfinance_aggtrade(candles)
                     # buff = self.plotter.plot_candles_mplfinance(candles, inference, False)
                     return caption, path_to_plot
 
@@ -260,6 +260,34 @@ class Plotter:
 
     def __init__(self):
         pass
+
+    @staticmethod
+    def plot_candles_mplfinance_aggtrade(candles):
+
+        """Plots candles using mplfinance, saves the plot and returns the path to the .png file.
+
+        :param candles: list of dictionaries with these keys: ['Open', 'High', 'Low', 'Close', 'Volume', 'DateTime'] and
+         the 'DateTime' field must be a miliseconds timestamp.
+        :param inference: the color of the last candle area will be determined based on this argument.
+        :param three_same_patterns: whether to consider the three last candles for highlighting.
+
+        :returns path_to_plot
+        """
+
+        sample_to_plot = pd.DataFrame(candles)
+        sample_to_plot.index = pd.DatetimeIndex(sample_to_plot['DateTime'])
+        now = datetime.datetime.now()
+        path_to_plot = '{}.png'.format(now.microsecond)
+
+        mpf.plot(sample_to_plot,
+                 type='candle',
+                 style='charles',
+                 volume=True,
+                 figscale=1.5,
+                 savefig=path_to_plot,
+                 show_nontrading=True)
+        plt.close()
+        return path_to_plot
 
     @staticmethod
     def plot_candles_mplfinance(candles, inference, three_same_patterns):
