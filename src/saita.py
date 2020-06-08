@@ -1,4 +1,5 @@
 import datetime
+import io
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -94,6 +95,7 @@ Volume change: {:.2f}%'''.format(n_trades,
                                  p_change * 100,
                                  v_change * 100)
                     path_to_plot = self.plotter.plot_candles_mplfinance(candles, inference, False)
+                    # buff = self.plotter.plot_candles_mplfinance(candles, inference, False)
                     return caption, path_to_plot
 
     def generate_reports_time_based(self, pair, time_frame, candles):
@@ -287,6 +289,7 @@ class Plotter:
             vlines_args = dict(vlines=sample_to_plot.index[-2], linewidths=160, alpha=0.3, colors=color)
         else:
             vlines_args = dict(vlines=sample_to_plot.index[-1], linewidths=40, alpha=0.3, colors=color)
+
         mpf.plot(sample_to_plot,
                  type='candle',
                  style='charles',
