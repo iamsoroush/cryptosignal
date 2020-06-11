@@ -18,7 +18,7 @@ from src.iohandler import sub_candle_collector, agg_trade_coroutine
 from src.saita import SAITA
 from src.saita_bot import SAITABot
 from src.data_handling import TimeDataHandler, TickDataHandler
-from src.utils import get_logger, read_binance_api, kline_mapper, agg_trade_mapper, try_decorator, get_tehran_ts
+from src.utils import get_logger, read_binance_api, kline_mapper, agg_trade_mapper, try_decorator
 from src.database import DBHandler
 
 
@@ -28,15 +28,6 @@ logger = get_logger(name=__name__, write_logs=True)
 # Connect to database
 db_handler = DBHandler()
 db_handler.start()
-
-
-def signal_handler(sig, frame):
-    manager.close()
-    print('closed binance websocket manager.')
-    sys.exit(0)
-
-
-signal.signal(signal.SIGINT, signal_handler)
 
 
 def candle_callback(msg):
@@ -50,20 +41,21 @@ def candle_callback(msg):
             time_frame = candle_data[kline_mapper['time_frame']]
             is_closed = candle_data[kline_mapper['is_closed']]
             if is_closed:
-                tehran_ts = float(get_tehran_ts(candle_data[kline_mapper['kline_close_time']]))
+                ts = float(candle_data[kline_mapper['kline_close_time']])
                 logger.info('received a closed candle for {}/{}'.format(pair, time_frame))
                 c = {'Open': float(candle_data[kline_mapper['Open']]),
                      'Close': float(candle_data[kline_mapper['Close']]),
                      'High': float(candle_data[kline_mapper['High']]),
                      'Low': float(candle_data[kline_mapper['Low']]),
                      'Volume': float(candle_data[kline_mapper['Volume']]),
-                     'DateTime': tehran_ts}
+                     'DateTime': ts}
                 kline_base_candle_collectors[pair].send(c)
         else:
-            trade_tehran_ts = float(get_tehran_ts(data[agg_trade_mapper['trade_time']]))
+            ts = float(data[agg_trade_mapper['trade_time']])
             price = float(data[agg_trade_mapper['price']])
             volume = float(data[agg_trade_mapper['volume']])
-            trade = [trade_tehran_ts, price, volume]
+            maker_is_buyer = float(data[agg_trade_mapper['buyer_maker']])
+            trade = [ts, price, volume, maker_is_buyer]
             agg_trade_candle_collectors[pair].send(trade)
 
 
@@ -73,7 +65,7 @@ def _get_usdt_pairs(client):
             and not any(elem in s['symbol'].split('USDT')[0] for elem in ['USD', 'BTC', 'ETH', 'BNB', 'XRP'])]
 
 
-def _get_streams(manager, pairs, base_time_frame, all_usdt_pairs, agg_trade_streams):
+def _get_streams(pairs, base_time_frame, all_usdt_pairs, agg_trade_streams):
     streams = list()
     if agg_trade_streams:
         agg_trade_streams = [pair.lower() + '@aggTrade' for pair in all_usdt_pairs]
@@ -81,6 +73,7 @@ def _get_streams(manager, pairs, base_time_frame, all_usdt_pairs, agg_trade_stre
     kline_streams = [pair.lower() + '@kline_' + base_time_frame for pair in pairs]
     streams.extend(kline_streams)
     return streams
+
 
 @try_decorator
 def start_binance_websocket_manager(agg_trade_streams=False):
@@ -90,14 +83,15 @@ def start_binance_websocket_manager(agg_trade_streams=False):
 
     # For time-based candles
     base_time_frame = TIME_FRAMES[0]
-    valid_pairs = [i[0] + i[1] for i in list(itertools.product(BASE_CURRENCY_LIST, TARGET_CURRENCY_LIST)) if i[0] != i[1]]
+    valid_pairs = [i[0] + i[1] for i in list(itertools.product(BASE_CURRENCY_LIST, TARGET_CURRENCY_LIST)) if
+                   i[0] != i[1]]
 
     # # For aggregated-trade candles, except BTC, ETH, BNB, XRP
     # all_usdt_pairs = _get_usdt_pairs(client)
     # n_trades = _get_n_trades_for_alts(all_usdt_pairs)
 
     # Add sockets to manager
-    streams = _get_streams(manager, valid_pairs, base_time_frame.string, list(N_TRADES.keys()), agg_trade_streams)
+    streams = _get_streams(valid_pairs, base_time_frame.string, list(N_TRADES.keys()), agg_trade_streams)
 
     # Generate time-based collectors for base time-frame
     global kline_base_candle_collectors
