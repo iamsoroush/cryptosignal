@@ -195,7 +195,7 @@ def agg_trade_coroutine(currency_pair, base_n_trades, n_trades, saita, bot, db_h
             candle = _create_agg_candle(trades)
 
             # Initialize
-            trades = np.zeros((n_trades, 3))
+            trades = np.zeros((n_trades, 4))
             pointer = 0
 
             # Process
