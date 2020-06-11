@@ -91,12 +91,13 @@ class SAITA:
     
 Price change: {:.2f}%
 Volume change: {:.2f}%
-Selling pressure: {:.2f}%'''.format(pair,
-                                    n_trades,
-                                    interval_sec,
-                                    p_change * 100,
-                                    v_change * 100,
-                                    last_candle['SellRatio'] * 100)
+Selling pressure: {:.2f}% ({:.2f}% change)'''.format(pair,
+                                                     n_trades,
+                                                     interval_sec,
+                                                     p_change * 100,
+                                                     v_change * 100,
+                                                     last_candle['SellRatio'] * 100,
+                                                     (last_candle['SellRatio'] - second_last_candle['SellRatio']) * 100)
                     path_to_plot = self.plotter.plot_candles_mplfinance_aggtrade(candles)
                     return caption, path_to_plot
 
