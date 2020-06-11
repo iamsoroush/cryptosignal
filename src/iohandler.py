@@ -159,6 +159,7 @@ def sub_candle_collector(time_frame,
 
 
 def _create_agg_candle(trades):
+    selling_ratio = np.mean(trades[:, 3])  # 1 ==> Bearish, 0 ==> Bullish
     candle = {'Open': trades[0][1],
               'Close': trades[-1][1],
               'High': trades[:, 1].max(),
@@ -166,13 +167,15 @@ def _create_agg_candle(trades):
               'Volume': trades[:, 2].sum(),
               'Open Time': float(trades[0][0]),
               'Close Time': float(trades[-1][0]),
-              'DateTime': float(trades[-1][0])}
+              'DateTime': float(trades[-1][0]),
+              'SellRatio': selling_ratio}
     return candle
 
 
 def agg_trade_coroutine(currency_pair, base_n_trades, n_trades, saita, bot, db_handler, children=None):
 
-    """In each yield, gents a dictionary of {'trade_time': int(ms), 'price': float, 'volume': float}.
+    """In each yield, gents a dictionary of :
+        {'trade_time': float(ms), 'price': float, 'volume': float, 'maker_is_buyer': float}
 
     Note: for base coroutine, give base_n_trades=1
     """
@@ -180,7 +183,7 @@ def agg_trade_coroutine(currency_pair, base_n_trades, n_trades, saita, bot, db_h
     assert n_trades % base_n_trades == 0
 
     memory = list()
-    trades = np.zeros((n_trades, 3))
+    trades = np.zeros((n_trades, 3), dtype=np.float)
     pointer = 0
     while True:
         trade = (yield)
