@@ -29,6 +29,7 @@ agg_trade_mapper = {'event_time': 'E',  # int
                     'price': 'p',  # str
                     'volume': 'q',  # str
                     'trade_time': 'T',  # int
+                    'buyer_maker': 'm',  # bool
                     }
 
 
@@ -109,7 +110,19 @@ def miliseconds_timestamp_to_str(ms_timestamp):
     return datetime.fromtimestamp(ms_timestamp / 1000).isoformat()
 
 
-def get_tehran_ts(ts):
-    dt = datetime.fromtimestamp(ts / 1000)
-    return dt.astimezone(pytz.timezone('Asia/Tehran')).timestamp() * 1000
+def tehran_msts_to_str(ts):
+
+    """Miliseconds-timestamp to Tehran str datetime."""
+
+    dt = datetime.fromtimestamp(ts / 1000)  # Assuming that the bot is running on the server with UTC timezone
+    dt = _timezone_converter(dt, current_tz='UTC', target_tz='Asia/Tehran')
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+    # return dt.astimezone(pytz.timezone('Asia/Tehran')).timestamp()
+
+
+def _timezone_converter(input_dt, current_tz, target_tz):
+    current_tz = pytz.timezone(current_tz)
+    target_tz = pytz.timezone(target_tz)
+    target_dt = current_tz.localize(input_dt).astimezone(target_tz)
+    return target_tz.normalize(target_dt)
 
