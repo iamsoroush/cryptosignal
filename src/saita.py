@@ -11,7 +11,7 @@ from plotly.subplots import make_subplots
 from src.candle import CandleProcessor
 from src.data_handling import DataLoader
 from src import N_DERIVATIVE_AGG_TRADE, N_DERIVATIVES, TIME_DATA_MEMORY_IN_DAYS
-from src.utils import miliseconds_timestamp_to_str
+from src.utils import tehran_msts_to_str
 
 report_time_based_consecutive = '''Report for *{}*@*{}*:
 
@@ -57,8 +57,9 @@ class SAITA:
 
         :param pair: ETHUSDT
         :param n_trades: number of trades each candle contains
-        :param candles: list of candles, each one is a dictionary candle of ('Open': float, 'Close': float,
-         'High': float, 'Low': float, 'Volume': float, 'Open Time': int(ms), 'Close Time': int(ms)]
+        :param candles: list of candles, each one is a dictionary candle of:
+         ('Open': float, 'Close': float, 'High': float, 'Low': float, 'Volume': float,
+          'Open Time': float(ms), 'Close Time': float(ms), 'SellRatio: float}
 
         :returns report: it will be None if could'nt find any momentum3 change on price and volume, else a report to
             send to users.
@@ -72,30 +73,31 @@ class SAITA:
             return None
 
         else:
-            if interval_sec < 60:
-                second_last_candle = candles[-2]
-                second_last_candle_interval = second_last_candle['Interval(s)']
+            second_last_candle = candles[-2]
+            second_last_candle_interval = second_last_candle['Interval(s)']
+            if interval_sec < 60 and second_last_candle_interval < 60:
                 if interval_sec <= second_last_candle_interval:
                     p_change = (last_candle['Close'] - last_candle['Open']) / (
                             last_candle['Open'] + np.finfo(float).eps)
-                    v_change = (last_candle['Volume'] - second_last_candle['Volume']) / (
-                            second_last_candle['Volume'] + np.finfo(float).eps)
+                    v_change = (last_candle['Volume'] - second_last_candle['Volume']) / \
+                               (second_last_candle['Volume'] + np.finfo(float).eps)
                     # inference = 'Bullish'
                     # if p_change < 0:
                     #     inference = 'Bearish'
                     # elif p_change == 0:
                     #     inference = None
 
-                    caption = '''*Instant signal*: *{}* trades just have been made for *{}* in {} seconds.
-
+                    caption = '''*Instant signal* for *{}*: *{}* trades just have been made in {} seconds.
+    
 Price change: {:.2f}%
-Volume change: {:.2f}%'''.format(n_trades,
-                                 pair,
-                                 interval_sec,
-                                 p_change * 100,
-                                 v_change * 100)
+Volume change: {:.2f}%
+Selling pressure: {:.2f}%'''.format(pair,
+                                    n_trades,
+                                    interval_sec,
+                                    p_change * 100,
+                                    v_change * 100,
+                                    last_candle['SellRatio'] * 100)
                     path_to_plot = self.plotter.plot_candles_mplfinance_aggtrade(candles)
-                    # buff = self.plotter.plot_candles_mplfinance(candles, inference, False)
                     return caption, path_to_plot
 
     def generate_reports_time_based(self, pair, time_frame, candles):
@@ -129,6 +131,8 @@ Volume change: {:.2f}%'''.format(n_trades,
             bears = ' - '.join(['\n  🔘 _{}_'.format(item) for item in candle_name_patterns['Bear']])
         else:
             bears = '_None_'
+
+        dt = tehran_msts_to_str(last_candle['DateTime'])
         formats = [pair,
                    time_frame.string,
                    bulls,
@@ -138,7 +142,7 @@ Volume change: {:.2f}%'''.format(n_trades,
                    last_candle['High'],
                    last_candle['Low'],
                    last_candle['Volume'],
-                   miliseconds_timestamp_to_str(last_candle['DateTime']).split('.')[0],
+                   dt,
                    pattern_site_inference]
 
         historical_inference = self._get_historical_inference(candles_df[['Open', 'High', 'Low', 'Close', 'Volume']],
@@ -275,7 +279,7 @@ class Plotter:
         """
 
         sample_to_plot = pd.DataFrame(candles)
-        sample_to_plot.index = pd.DatetimeIndex(sample_to_plot['DateTime'])
+        sample_to_plot.index = pd.DatetimeIndex(sample_to_plot['DateTime'] * 1e6).tz_localize('UTC').tz_convert('Asia/Tehran')
         now = datetime.datetime.now()
         path_to_plot = '{}.png'.format(now.microsecond)
 
@@ -303,7 +307,7 @@ class Plotter:
         """
 
         sample_to_plot = pd.DataFrame(candles)
-        sample_to_plot.index = pd.DatetimeIndex(sample_to_plot['DateTime'])
+        sample_to_plot.index = pd.DatetimeIndex(sample_to_plot['DateTime'] * 1e6).tz_localize('UTC').tz_convert('Asia/Tehran')
         now = datetime.datetime.now()
         path_to_plot = '{}.png'.format(now.microsecond)
         if inference == 'Bullish':
