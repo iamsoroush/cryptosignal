@@ -183,7 +183,7 @@ def agg_trade_coroutine(currency_pair, base_n_trades, n_trades, saita, bot, db_h
     assert n_trades % base_n_trades == 0
 
     memory = list()
-    trades = np.zeros((n_trades, 3), dtype=np.float)
+    trades = np.zeros((n_trades, 4), dtype=np.float)
     pointer = 0
     while True:
         trade = (yield)
