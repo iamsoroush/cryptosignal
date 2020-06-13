@@ -281,6 +281,8 @@ class Plotter:
 
         sample_to_plot = pd.DataFrame(candles)
         sample_to_plot.index = pd.DatetimeIndex(sample_to_plot['DateTime'] * 1e6).tz_localize('UTC').tz_convert('Asia/Tehran')
+        addplot = [mpf.make_addplot((sample_to_plot['SellRatio']), panel='lower', color='blue', linestyle='dotted')]
+
         now = datetime.datetime.now()
         path_to_plot = '{}.png'.format(now.microsecond)
 
@@ -290,7 +292,8 @@ class Plotter:
                  volume=True,
                  figscale=1.5,
                  savefig=path_to_plot,
-                 show_nontrading=True)
+                 show_nontrading=True,
+                 addplot=addplot)
         plt.close()
         return path_to_plot
 
