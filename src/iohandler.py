@@ -4,7 +4,7 @@ import threading
 import numpy as np
 from telegram import ParseMode
 
-from src import COLLECTOR_MEMORY, AGG_TRADE_COLLECTOR_MEMORY, GROUP_CHAT_ID
+from src import COLLECTOR_MEMORY, AGG_TRADE_COLLECTOR_MEMORY, GROUP_CHAT_ID, AGG_TRADE_COLLECTOR_REAL_MEMORY
 
 
 def send_report(bot, users, report, plot_path, hist_inference_report, dist_plot_path):
@@ -200,16 +200,33 @@ def agg_trade_coroutine(currency_pair, base_n_trades, n_trades, saita, bot, db_h
 
             # Process
             memory.append(candle)
-            report = saita.generate_report_agg_trade(currency_pair, n_trades, memory)
+            n_candles = len(memory)
+            if n_candles > AGG_TRADE_COLLECTOR_MEMORY:
+                report = saita.generate_report_agg_trade(currency_pair, n_trades, memory[-AGG_TRADE_COLLECTOR_MEMORY:])
+            else:
+                report = saita.generate_report_agg_trade(currency_pair, n_trades, memory)
             if report:
                 caption, plot_path = report
                 print('sending agg_trade report of {}/{} to the group.'.format(currency_pair, n_trades))
                 sender = threading.Thread(target=send_agg_trade_report, args=(bot, caption, plot_path), daemon=True)
                 sender.start()
-            if len(memory) > AGG_TRADE_COLLECTOR_MEMORY:
-                memory.pop(0)
+            if len(memory) == AGG_TRADE_COLLECTOR_REAL_MEMORY:
+                n_trades = _get_new_n_trades(memory)
+                # memory.pop(0)
+                memory = memory[-AGG_TRADE_COLLECTOR_MEMORY + 1:]
 
             # Send to children
             if children:
                 for child in children:
                     child.send(candle)
+
+
+def _get_new_n_trades(candles, n_trades):
+    intervals = np.array([item['Interval(s)'] for item in candles])
+    n_less_minutes = len(intervals < 60)
+    if n_less_minutes < int(AGG_TRADE_COLLECTOR_REAL_MEMORY * 0.02):
+        return int(n_trades * 0.9)
+    elif n_less_minutes > int(AGG_TRADE_COLLECTOR_REAL_MEMORY * 0.2):
+        return n_trades * 1.1
+    else:
+        return n_trades
