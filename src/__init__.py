@@ -52,6 +52,7 @@ COLLECTOR_MEMORY = 10  # How many candle do collector save to send to the saita'
 
 # Aggregated Trades
 AGG_TRADE_COLLECTOR_MEMORY = 50
+AGG_TRADE_COLLECTOR_REAL_MEMORY = 100  # Memory for calculating n_trades in a dynamic manner
 TICK_BARS = (100, 500, 1000, 5000)
 
 with open(os.path.join(FIlE_DIR, 'n_trades.pkl'), 'rb') as f:
