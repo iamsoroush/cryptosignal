@@ -5,6 +5,10 @@ import numpy as np
 from telegram import ParseMode
 
 from src import COLLECTOR_MEMORY, AGG_TRADE_COLLECTOR_MEMORY, GROUP_CHAT_ID, AGG_TRADE_COLLECTOR_REAL_MEMORY
+from src.utils import get_logger
+
+
+logger = get_logger(name=__name__, write_logs=True)
 
 
 def send_report(bot, users, report, plot_path, hist_inference_report, dist_plot_path):
@@ -117,7 +121,7 @@ def sub_candle_collector(time_frame,
     :param db_handler: object of DBHandler for fetching data from database.
     :param children: a list of collectors to send the candles from this collector to them."""
 
-    print('I am {} collector for {}.'.format(time_frame.string, currency_pair))
+    logger.info('I am {} collector for {}.'.format(time_frame.string, currency_pair))
 
     assert time_frame.minutes % base_time_frame.minutes == 0
 
@@ -138,7 +142,7 @@ def sub_candle_collector(time_frame,
                 res = saita.generate_reports_time_based(currency_pair, time_frame, memory)
                 if res:
                     report, plot_path, hist_inference_report, dist_plot_path = res
-                    print('sending report of {}/{} to {} users.'.format(currency_pair, time_frame.string, len(users)))
+                    logger.info('sending report of {}/{} to {} users.'.format(currency_pair, time_frame.string, len(users)))
                     sender = threading.Thread(target=send_report,
                                               args=(bot,
                                                     users,
@@ -194,10 +198,6 @@ def agg_trade_coroutine(currency_pair, base_n_trades, n_trades, saita, bot, db_h
             # Make candle
             candle = _create_agg_candle(trades)
 
-            # Initialize
-            trades = np.zeros((n_trades, 4))
-            pointer = 0
-
             # Process
             memory.append(candle)
             n_candles = len(memory)
@@ -207,7 +207,7 @@ def agg_trade_coroutine(currency_pair, base_n_trades, n_trades, saita, bot, db_h
                 report = saita.generate_report_agg_trade(currency_pair, n_trades, memory)
             if report:
                 caption, plot_path = report
-                print('sending agg_trade report of {}/{} to the group.'.format(currency_pair, n_trades))
+                logger.info('sending agg_trade report of {}/{} to the group.'.format(currency_pair, n_trades))
                 sender = threading.Thread(target=send_agg_trade_report, args=(bot, caption, plot_path), daemon=True)
                 sender.start()
             if len(memory) == AGG_TRADE_COLLECTOR_REAL_MEMORY:
@@ -220,13 +220,21 @@ def agg_trade_coroutine(currency_pair, base_n_trades, n_trades, saita, bot, db_h
                 for child in children:
                     child.send(candle)
 
+            # Initialize
+            trades = np.zeros((n_trades, 4))
+            pointer = 0
 
-def _get_new_n_trades(candles, n_trades):
+
+def _get_new_n_trades(candles, n_trades, pair):
     intervals = np.array([item['Interval(s)'] for item in candles])
     n_less_minutes = len(intervals < 60)
     if n_less_minutes < int(AGG_TRADE_COLLECTOR_REAL_MEMORY * 0.02):
-        return int(n_trades * 0.9)
-    elif n_less_minutes > int(AGG_TRADE_COLLECTOR_REAL_MEMORY * 0.2):
-        return n_trades * 1.1
+        new_n_trades = int(n_trades * 0.75)
+        logger.info('n_trades changed from {} to {} for {}.'.format(n_trades, new_n_trades, pair))
+        return new_n_trades
+    elif n_less_minutes > int(AGG_TRADE_COLLECTOR_REAL_MEMORY * 0.1):
+        new_n_trades = int(n_trades * 1.5)
+        logger.info('n_trades changed from {} to {} for {}.'.format(n_trades, new_n_trades, pair))
+        return new_n_trades
     else:
         return n_trades
