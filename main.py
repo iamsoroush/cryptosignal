@@ -1,8 +1,7 @@
 import itertools
 import datetime
 import threading
-import signal
-import sys
+from time import sleep
 import pickle
 import argparse
 
@@ -49,14 +48,20 @@ def candle_callback(msg):
                      'Low': float(candle_data[kline_mapper['Low']]),
                      'Volume': float(candle_data[kline_mapper['Volume']]),
                      'DateTime': ts}
-                kline_base_candle_collectors[pair].send(c)
+                try:
+                    kline_base_candle_collectors[pair].send(c)
+                except Exception as e:
+                    logger.exception('kline - {} - {} - error: {}'.format(pair, time_frame, e))
         else:
             ts = float(data[agg_trade_mapper['trade_time']])
             price = float(data[agg_trade_mapper['price']])
             volume = float(data[agg_trade_mapper['volume']])
             maker_is_buyer = float(data[agg_trade_mapper['buyer_maker']])
             trade = [ts, price, volume, maker_is_buyer]
-            agg_trade_candle_collectors[pair].send(trade)
+            try:
+                agg_trade_candle_collectors[pair].send(trade)
+            except Exception as e:
+                logger.exception('agg_trade - {} - {} - error: {}'.format(pair, e))
 
 
 def _get_usdt_pairs(client):
@@ -262,3 +267,4 @@ if __name__ == '__main__':
                                 args=(data_handler,))
         timer.start()
         timer.join()
+        sleep(60)
