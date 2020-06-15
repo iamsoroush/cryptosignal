@@ -211,9 +211,9 @@ def agg_trade_coroutine(currency_pair, base_n_trades, n_trades, saita, bot, db_h
                 sender = threading.Thread(target=send_agg_trade_report, args=(bot, caption, plot_path), daemon=True)
                 sender.start()
             if len(memory) == AGG_TRADE_COLLECTOR_REAL_MEMORY:
-                n_trades = _get_new_n_trades(memory)
+                n_trades = _get_new_n_trades(memory, n_trades, currency_pair)
                 # memory.pop(0)
-                memory = memory[-AGG_TRADE_COLLECTOR_MEMORY + 1:]
+                memory = memory[-AGG_TRADE_COLLECTOR_MEMORY:]
 
             # Send to children
             if children:
