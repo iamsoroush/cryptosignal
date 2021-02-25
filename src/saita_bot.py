@@ -392,6 +392,6 @@ def get_start_markup(pair, time_frame):
 
 
 # if __name__ == '__main__':
-#     token = '1069900023:AAGU8F0vdcAYxewlhbzsK8hxmfkggqqkbgs'
+#     token = your telegram bot's token
 #     bot = SAITABot(token)
 #     bot.run()
