@@ -1,6 +1,6 @@
 # CryptoSAITA
 
-SorMeh's AI-based Trading Assistant.
+AI-based Trading Assistant.
 
 ## Install (ubuntu):
 - `conda create -n crypto python=3.6.4`
