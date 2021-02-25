@@ -1,6 +1,6 @@
 # CryptoSAITA
 
-AI-based Trading Assistant.
+A Telegram bot which is an AI-based Trading Assistant (AITA).
 
 ## Install (ubuntu):
 - `conda create -n crypto python=3.6.4`
