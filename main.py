@@ -124,7 +124,7 @@ def get_saita():
 
 def get_saita_bot(db_handler):
     # Create telegram bot
-    token = '1069900023:AAGU8F0vdcAYxewlhbzsK8hxmfkggqqkbgs'
+    token = "fdsafdasfdsa" ## Your binance token
     saita_bot = SAITABot(token, db_handler)
     return saita_bot
 
