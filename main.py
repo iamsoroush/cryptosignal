@@ -1,3 +1,4 @@
+import os
 import itertools
 import datetime
 import threading
@@ -61,7 +62,7 @@ def candle_callback(msg):
             try:
                 agg_trade_candle_collectors[pair].send(trade)
             except Exception as e:
-                logger.exception('agg_trade - {} - {} - error: {}'.format(pair, e))
+                logger.exception('agg_trade - {} - error: {}'.format(pair, e))
 
 
 def _get_usdt_pairs(client):
@@ -124,7 +125,9 @@ def get_saita():
 
 def get_saita_bot(db_handler):
     # Create telegram bot
-    token = "fdsafdasfdsa" ## Your binance token
+
+    with open('telegram.txt', 'r') as file:
+        token = file.readline()
     saita_bot = SAITABot(token, db_handler)
     return saita_bot
 
@@ -223,7 +226,7 @@ def pars_args():
                         help='Update the time-data at the start?',
                         action='store_true')
     parser.add_argument('--update_n_trades',
-                        help='Update the time-data at the start?',
+                        help='Update the n_trades at the start?',
                         action='store_true')
 
     args = parser.parse_args()

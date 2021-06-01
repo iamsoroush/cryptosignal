@@ -10,9 +10,8 @@ def read_currencies(path):
             currencies.append(i.split()[0])
     return currencies
 
-
-FIlE_DIR = os.path.dirname(os.path.realpath(__file__))
-ROOT_DIR = os.path.dirname(FIlE_DIR)
+PACKAGE_DIR = os.path.dirname(os.path.realpath(__file__))
+ROOT_DIR = os.path.dirname(PACKAGE_DIR)
 sys.path.append(ROOT_DIR)
 
 # Paths
@@ -37,8 +36,8 @@ class TimeFrame:
 # General parameters
 # BASE_CURRENCY_LIST = ('BTC', 'ETH', 'LINK', 'XRP', 'BNB', 'XTZ')
 # TARGET_CURRENCY_LIST = ('USDT', 'BTC')
-BASE_CURRENCY_LIST = read_currencies(os.path.join(FIlE_DIR, 'base_currency_list.txt'))
-TARGET_CURRENCY_LIST = read_currencies(os.path.join(FIlE_DIR, 'target_currency_list.txt'))
+BASE_CURRENCY_LIST = read_currencies(os.path.join(PACKAGE_DIR, 'base_currency_list.txt'))
+TARGET_CURRENCY_LIST = read_currencies(os.path.join(PACKAGE_DIR, 'target_currency_list.txt'))
 TIME_FRAMES = (TimeFrame('3m', 3),
                TimeFrame('15m', 15),
                TimeFrame('30m', 30),
@@ -55,7 +54,7 @@ AGG_TRADE_COLLECTOR_MEMORY = 50
 AGG_TRADE_COLLECTOR_REAL_MEMORY = 100  # Memory for calculating n_trades in a dynamic manner
 TICK_BARS = (100, 500, 1000, 5000)
 
-with open(os.path.join(FIlE_DIR, 'n_trades.pkl'), 'rb') as f:
+with open(os.path.join(PACKAGE_DIR, 'n_trades.pkl'), 'rb') as f:
     N_TRADES = pickle.load(f)
 N_DERIVATIVE_AGG_TRADE = 2
 GROUP_CHAT_ID = -1001119615266

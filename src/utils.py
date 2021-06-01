@@ -7,6 +7,8 @@ import pytz
 
 import pandas as pd
 
+from . import ROOT_DIR
+
 
 kline_mapper = {'kline_start_time': 't',
                 'kline_close_time': 'T',
@@ -54,14 +56,13 @@ def try_decorator(func):
 
 
 def read_binance_api():
-    dir_path = os.path.dirname(os.path.realpath(__file__))
     api_key = None
     api_secret = None
-    with open(os.path.join(dir_path, 'binance.txt'), 'r') as file:
+    with open(os.path.join(ROOT_DIR, '../binance.txt'), 'r') as file:
         for line in file.readlines():
-            if line.startswith('API key'):
+            if line.startswith('API'):
                 api_key = line.split(' ')[-1]
-            elif line.startswith('secret key'):
+            elif line.startswith('secret'):
                 api_secret = line.split(' ')[-1]
     return api_key, api_secret
 
