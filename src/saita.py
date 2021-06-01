@@ -11,7 +11,7 @@ from plotly.subplots import make_subplots
 from src.candle import CandleProcessor
 from src.data_handling import DataLoader
 from src import N_DERIVATIVE_AGG_TRADE, N_DERIVATIVES, TIME_DATA_MEMORY_IN_DAYS
-from src.utils import tehran_msts_to_str
+from src.utils import timezone_msts_to_str
 
 report_time_based_consecutive = '''Report for *{}*@*{}*:
 
@@ -133,7 +133,7 @@ Selling pressure: {:.2f}% ({:.2f}% change)'''.format(pair,
         else:
             bears = '_None_'
 
-        dt = tehran_msts_to_str(last_candle['DateTime'])
+        dt = timezone_msts_to_str(last_candle['DateTime'])
         formats = [pair,
                    time_frame.string,
                    bulls,

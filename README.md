@@ -22,8 +22,15 @@ A Telegram bot which is an AI-based Trading Assistant (AITA).
 
 
 ## How to use?
-After installing the required packages, place your *binance API Key and secret Key* on `binance.txt` file, and your telegram bot token on `telegram.txt`, then run the main file:
+After installing the required packages, place your *binance API Key and secret Key* on `binance.txt` file, your telegram bot token on `telegram.txt`, and your preferred timezone on `timezone.txt`. 
+
+Now run the main file:
 `python3 run main.py`
+
+## Notes
+
+- We assume that the Bot is running on a server with **UTC** timezone.
+- Data-based reports and telegram-bot's language is **Persian**, you can change the reports and the bot's language on `saita_bot.py` and `saita.py` files. Sorry about that, I'm currently out of time to change the language to English.
 
 ## Sample Reports
 *Pattern-based Report*

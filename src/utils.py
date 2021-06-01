@@ -111,12 +111,15 @@ def miliseconds_timestamp_to_str(ms_timestamp):
     return datetime.fromtimestamp(ms_timestamp / 1000).isoformat()
 
 
-def tehran_msts_to_str(ts):
+def timezone_msts_to_str(ts):
 
-    """Miliseconds-timestamp to Tehran str datetime."""
+    """Miliseconds-timestamp to timezone str datetime."""
+
+    with open(os.path.join(ROOT_DIR, 'timezone.txt'), 'r') as file:
+        target_tz = file.readline()
 
     dt = datetime.fromtimestamp(ts / 1000)  # Assuming that the bot is running on the server with UTC timezone
-    dt = _timezone_converter(dt, current_tz='UTC', target_tz='Asia/Tehran')
+    dt = _timezone_converter(dt, current_tz='UTC', target_tz=target_tz)
     return dt.strftime("%Y-%m-%d %H:%M:%S")
     # return dt.astimezone(pytz.timezone('Asia/Tehran')).timestamp()
 
