@@ -25,7 +25,7 @@ A Telegram bot which is an AI-based Trading Assistant (AITA).
 After installing the required packages, place your *binance API Key and secret Key* on `binance.txt` file, your telegram bot token on `telegram.txt`, and your preferred timezone on `timezone.txt`. 
 
 Now run the main file:
-`python3 run main.py`
+`python3 main.py`
 
 ## Notes
 
